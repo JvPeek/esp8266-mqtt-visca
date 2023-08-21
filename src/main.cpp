@@ -16,49 +16,148 @@
 
 #define MAXX 1023
 #define MAXY 255
-#define MAXZ 255
+#define MAXZ 2305
 #define MAXF 255
+
+class PTZCam {
+   public:
+    // Constructor
+    PTZCam(int xValue = 1023 / 2, int yValue = 255 / 2, int zValue = 255 / 2,
+           int focusValue = 255 / 2)
+        : x(xValue), y(yValue), z(zValue), focus(focusValue) {}
+
+    // Getter methods
+    int getX() const { return x; }
+    int getY() const { return y; }
+    int getZ() const { return z; }
+    int getFocus() const { return focus; }
+
+    // Setter methods
+    void setX(int newX) {
+        newX = constrain(newX, 0, MAXX);
+        x = newX;
+    }
+    void setY(int newY) {
+        newY = constrain(newY, 0, MAXY);
+        y = newY;
+    }
+    void setZ(int newZ) {
+        newZ = constrain(newZ, 0, MAXZ);
+        z = newZ;
+    }
+    void setFocus(int newFocus) {
+        newFocus = constrain(newFocus, 0, MAXF);
+        focus = newFocus;
+    }
+    void moveCamera() {
+        Serial.write(0x81);
+        Serial.write(0x01);
+        Serial.write(0x06);
+        Serial.write(0x02);
+        Serial.write(0x00);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+    }
+
+   private:
+    int x;
+    int y;
+    int z;
+    int focus;
+};
+
+PTZCam cams[7];
 
 void debugPrint(String prompt) {}
 void debugPrintln(String prompt) { debugPrint(prompt + "\n"); }
 void handleSerial();
 
-#define VISCACOMMAND_MAX_LENGTH 64
+#define VISCACOMMAND_MAX_LENGTH 128
 
 struct VISCACommand {
     uint8_t len;
     uint8_t payload[VISCACOMMAND_MAX_LENGTH];
 };
 
-VISCACommand makePackage(byte* payload, uint8_t camNum);
-VISCACommand blink(uint8_t led, uint8_t mode, uint8_t cam);
-
-VISCACommand makePackage(byte* payload, uint8_t camNum) {
+VISCACommand makePackage(byte* payload, uint8_t length, uint8_t camNum) {
     VISCACommand cmd;
     uint8_t charCount = 0;
-    cmd.len = 5;
     cmd.payload[charCount++] = 0x81 + camNum;
-    for (uint8_t i = 0; i < sizeof(payload); i++) {
+    for (uint8_t i = 0; i < length; i++) {
         cmd.payload[charCount++] = payload[i];
     }
     cmd.payload[charCount++] = 0xFF;
     cmd.len = charCount;
     return cmd;
 }
-VISCACommand blink(uint8_t led = 0, uint8_t mode = 0, uint8_t cam = 0) {
+VISCACommand blinkenlights(uint8_t led = 0, uint8_t mode = 0, uint8_t cam = 0) {
     byte cmd[] = {0x01, 0x33, led, mode};
-    VISCACommand command = makePackage(cmd, cam);
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
 }
 
-VISCACommand flip(bool flipSetting = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x04, 0x66, (flipSetting ? 0x02 : 0x03)};
-    VISCACommand command = makePackage(cmd, cam);
+VISCACommand flip(bool setting = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x04, 0x66, (setting ? 0x02 : 0x03)};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
 }
-VISCACommand mirror(bool mirrorSetting = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x04, 0x61, (mirrorSetting ? 0x02 : 0x03)};
-    VISCACommand command = makePackage(cmd, cam);
+VISCACommand mirror(bool setting = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x04, 0x61, (setting ? 0x02 : 0x03)};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+    return command;
+}
+VISCACommand backlight(bool setting = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x04, 0x33, 0x02, (setting ? 0x02 : 0x03)};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+    return command;
+}
+VISCACommand mmdetect(bool setting = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x50, 0x30, 0x01, setting};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+    return command;
+}
+void convertValues(uint input, byte* output) {
+    output[0] = (input >> 12) & 0x0f;
+    output[1] = (input >> 8) & 0x0f;
+    output[2] = (input >> 4) & 0x0f;
+    output[3] = input & 0x0f;
+}
+VISCACommand movement(uint8_t cam = 0) {
+    const uint x = cams[cam].getX();
+    const uint y = cams[cam].getY();
+    const uint z = cams[cam].getZ();
+    const uint focus = cams[cam].getFocus();
+
+    byte xValues[4];
+    convertValues(x, xValues);
+
+    byte yValues[4];
+    convertValues(y, yValues);
+
+    byte zValues[4];
+    convertValues(z, zValues);
+
+    byte focusValues[4];
+    convertValues(focus, focusValues);
+
+    // 0p 0q 0r 0s PAN
+    // 0t 0u 0v 0w TILT
+    // 0x 0y 0z 0g ZOOM
+    // 0h 0i 0j 0k FOCUS
+
+    byte cmd[] = {
+        0x01,           0x06,           0x20,           xValues[0],
+        xValues[1],     xValues[2],     xValues[3],
+
+        yValues[0],     yValues[1],     yValues[2],     yValues[3],
+        zValues[0],     zValues[1],     zValues[2],     zValues[3],
+        focusValues[0], focusValues[1], focusValues[2], focusValues[3]};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
 }
 
@@ -278,59 +377,7 @@ FLIP
 LED ON/OFF/BLINK
 
 */
-class PTZCam {
-   public:
-    // Constructor
-    PTZCam(int xValue = 1023 / 2, int yValue = 255 / 2, int zValue = 255 / 2,
-           int focusValue = 255 / 2)
-        : x(xValue), y(yValue), z(zValue), focus(focusValue) {}
 
-    // Getter methods
-    int getX() const { return x; }
-    int getY() const { return y; }
-    int getZ() const { return z; }
-    int getFocus() const { return focus; }
-
-    // Setter methods
-    void setX(int newX) {
-        newX = constrain(newX, 0, MAXX);
-        x = newX;
-    }
-    void setY(int newY) {
-        newY = constrain(newY, 0, MAXY);
-        y = newY;
-    }
-    void setZ(int newZ) {
-        newZ = constrain(newZ, 0, MAXZ);
-        z = newZ;
-    }
-    void setFocus(int newFocus) {
-        newFocus = constrain(newFocus, 0, MAXF);
-        focus = newFocus;
-    }
-    void moveCamera() {
-        Serial.write(0x81);
-        Serial.write(0x01);
-        Serial.write(0x06);
-        Serial.write(0x02);
-        Serial.write(0x00);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-    }
-
-   private:
-    int x;
-    int y;
-    int z;
-    int focus;
-};
-
-PTZCam cams[7];
 void handleSerial() {
     bool newData = false;
     char buff[17] = {0};
@@ -350,31 +397,75 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (!responseObject.containsKey("cam")) {
         responseObject.set("cam", 0);
     }
+    uint8_t camNum = responseObject["cam"].as<uint8_t>();
 
     if (strcmp(topic, "visca/command/raw") == 0) {
         Serial.write(payload, length);
-
         client.publish(mqtt_topicresult,
                        ("Kotze Daten " + String(length)).c_str());
     }
     if (strcmp(topic, "visca/command/x") == 0) {
         cams[0].setX(2);
     }
-    if (strcmp(topic, "visca/command/blink") == 0) {
-        VISCACommand command = blink(responseObject["led"].as<uint8_t>(),
-                                     responseObject["mode"].as<uint8_t>(),
-                                     responseObject["cam"].as<uint8_t>());
+    if (strcmp(topic, "visca/command/blinkenlights") == 0) {
+        VISCACommand command =
+            blinkenlights(responseObject["led"].as<uint8_t>(),
+                          responseObject["mode"].as<uint8_t>(),
+                          responseObject["cam"].as<uint8_t>());
         Serial.write(command.payload, command.len);
     }
-    if (strcmp(topic, "visca/command/flip") == 0) {
-        VISCACommand command = flip(responseObject["flip"].as<bool>(),
-                                    responseObject["cam"].as<uint8_t>());
+    if (strcmp(topic, "visca/command/settings") == 0) {
+        if (responseObject.containsKey("backlight")) {
+            VISCACommand command =
+                backlight(responseObject["backlight"].as<bool>(),
+                          responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+
+        if (responseObject.containsKey("mirror")) {
+            VISCACommand command = mirror(responseObject["mirror"].as<bool>(),
+                                          responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+        if (responseObject.containsKey("flip")) {
+            VISCACommand command = flip(responseObject["flip"].as<bool>(),
+                                        responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+
+        if (responseObject.containsKey("mmdetect")) {
+            VISCACommand command =
+                mmdetect(responseObject["mmdetect"].as<bool>(),
+                         responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+
+        //  ir_output, ir_cameracontrol
+    }
+
+    if (strcmp(topic, "visca/command/moveto") == 0) {
+        if (responseObject.containsKey("x")) {
+            cams[responseObject["cam"].as<uint8_t>()].setX(
+                responseObject["x"].as<int>());
+        }
+        if (responseObject.containsKey("y")) {
+            cams[responseObject["cam"].as<uint8_t>()].setY(
+                responseObject["y"].as<int>());
+        }
+        if (responseObject.containsKey("z")) {
+            cams[responseObject["cam"].as<uint8_t>()].setZ(
+                responseObject["z"].as<int>());
+        }
+        if (responseObject.containsKey("focus")) {
+            cams[responseObject["cam"].as<uint8_t>()].setFocus(
+                responseObject["focus"].as<int>());
+        }
+        VISCACommand command = movement(responseObject["cam"].as<uint8_t>());
+
         Serial.write(command.payload, command.len);
     }
-    if (strcmp(topic, "visca/command/mirror") == 0) {
-        VISCACommand command = mirror(responseObject["mirror"].as<bool>(),
-                                    responseObject["cam"].as<uint8_t>());
-        Serial.write(command.payload, command.len);
+
+    if (strcmp(topic, "visca/command/moveby") == 0) {
     }
     Serial.flush();
 }
