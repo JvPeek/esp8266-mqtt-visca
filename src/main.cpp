@@ -51,6 +51,17 @@ VISCACommand blink(uint8_t led = 0, uint8_t mode = 0, uint8_t cam = 0) {
     return command;
 }
 
+VISCACommand flip(bool flipSetting = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x04, 0x66, (flipSetting ? 0x02 : 0x03)};
+    VISCACommand command = makePackage(cmd, cam);
+    return command;
+}
+VISCACommand mirror(bool mirrorSetting = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x04, 0x61, (mirrorSetting ? 0x02 : 0x03)};
+    VISCACommand command = makePackage(cmd, cam);
+    return command;
+}
+
 // flag for saving data
 bool shouldSaveConfig = false;
 
@@ -336,6 +347,9 @@ void handleSerial() {
 void callback(char* topic, byte* payload, unsigned int length) {
     DynamicJsonBuffer response(1024);
     JsonObject& responseObject = response.parseObject(payload);
+    if (!responseObject.containsKey("cam")) {
+        responseObject.set("cam", 0);
+    }
 
     if (strcmp(topic, "visca/command/raw") == 0) {
         Serial.write(payload, length);
@@ -347,7 +361,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
         cams[0].setX(2);
     }
     if (strcmp(topic, "visca/command/blink") == 0) {
-        VISCACommand command = blink(responseObject["led"].as<uint8_t>(), responseObject["mode"].as<uint8_t>(), 0);
+        VISCACommand command = blink(responseObject["led"].as<uint8_t>(),
+                                     responseObject["mode"].as<uint8_t>(),
+                                     responseObject["cam"].as<uint8_t>());
+        Serial.write(command.payload, command.len);
+    }
+    if (strcmp(topic, "visca/command/flip") == 0) {
+        VISCACommand command = flip(responseObject["flip"].as<bool>(),
+                                    responseObject["cam"].as<uint8_t>());
+        Serial.write(command.payload, command.len);
+    }
+    if (strcmp(topic, "visca/command/mirror") == 0) {
+        VISCACommand command = mirror(responseObject["mirror"].as<bool>(),
+                                    responseObject["cam"].as<uint8_t>());
         Serial.write(command.payload, command.len);
     }
     Serial.flush();
