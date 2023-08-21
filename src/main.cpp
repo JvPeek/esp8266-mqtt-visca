@@ -4,6 +4,7 @@
 #include <ESP8266WiFi.h>  //https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>
 #include <FS.h>  //this needs to be first, or it all crashes and burns...
+
 // needed for library
 
 #include <DNSServer.h>
@@ -13,9 +14,42 @@
 #include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
 #include <WiFiUdp.h>
 
+#define MAXX 1023
+#define MAXY 255
+#define MAXZ 255
+#define MAXF 255
+
 void debugPrint(String prompt) {}
 void debugPrintln(String prompt) { debugPrint(prompt + "\n"); }
 void handleSerial();
+
+#define VISCACOMMAND_MAX_LENGTH 64
+
+struct VISCACommand {
+    uint8_t len;
+    uint8_t payload[VISCACOMMAND_MAX_LENGTH];
+};
+
+VISCACommand makePackage(byte* payload, uint8_t camNum);
+VISCACommand blink(uint8_t led, uint8_t mode, uint8_t cam);
+
+VISCACommand makePackage(byte* payload, uint8_t camNum) {
+    VISCACommand cmd;
+    uint8_t charCount = 0;
+    cmd.len = 5;
+    cmd.payload[charCount++] = 0x81 + camNum;
+    for (uint8_t i = 0; i < sizeof(payload); i++) {
+        cmd.payload[charCount++] = payload[i];
+    }
+    cmd.payload[charCount++] = 0xFF;
+    cmd.len = charCount;
+    return cmd;
+}
+VISCACommand blink(uint8_t led = 0, uint8_t mode = 0, uint8_t cam = 0) {
+    byte cmd[] = {0x01, 0x33, led, mode};
+    VISCACommand command = makePackage(cmd, cam);
+    return command;
+}
 
 // flag for saving data
 bool shouldSaveConfig = false;
@@ -26,7 +60,7 @@ void callback(char* topic, byte* payload, unsigned int length);
 // config.json, they are overwritten. char mqtt_server[40];
 #define mqtt_server "192.168.2.11"
 #define mqtt_port "1883"
-#define mqtt_topic "visca/raw"
+#define mqtt_topic "visca/command/#"
 #define mqtt_topicresult "visca/status"
 
 WiFiClient espClient;
@@ -203,7 +237,7 @@ void reconnect() {
         clientId += String(random(0xffff), HEX);
         if (client.connect(clientId.c_str())) {
             debugPrint("connected");
-            client.subscribe(mqtt_topic);
+            client.subscribe("visca/command/#");
             client.publish(mqtt_topicresult, "ready");
 
         } else {
@@ -214,26 +248,6 @@ void reconnect() {
         }
     }
 }
-bool doSpam = false;
-void spamLoop() {
-    if (!doSpam) {
-        return;
-    }
-    uint8_t command[32];
-
-    command[0] = 0x88;
-    command[1] = 0x01;
-    command[2] = 0x04;
-    command[3] = 0x00;
-    command[4] = 0x03;
-    command[5] = 0xff;
-
-    for (uint8_t addr = 0x81; addr <= 0x88; addr++) {
-        command[0] = addr;
-        Serial.write(command, 6);
-        Serial.flush();
-    }
-}
 void loop() {
     if (!client.connected()) {
         reconnect();
@@ -241,26 +255,100 @@ void loop() {
     client.loop();
     ArduinoOTA.handle();
     handleSerial();
-    spamLoop();
 }
+
+/* todo:
+
+PAN / TILT
+ZOOM
+FOCUS
+FLIP
+
+LED ON/OFF/BLINK
+
+*/
+class PTZCam {
+   public:
+    // Constructor
+    PTZCam(int xValue = 1023 / 2, int yValue = 255 / 2, int zValue = 255 / 2,
+           int focusValue = 255 / 2)
+        : x(xValue), y(yValue), z(zValue), focus(focusValue) {}
+
+    // Getter methods
+    int getX() const { return x; }
+    int getY() const { return y; }
+    int getZ() const { return z; }
+    int getFocus() const { return focus; }
+
+    // Setter methods
+    void setX(int newX) {
+        newX = constrain(newX, 0, MAXX);
+        x = newX;
+    }
+    void setY(int newY) {
+        newY = constrain(newY, 0, MAXY);
+        y = newY;
+    }
+    void setZ(int newZ) {
+        newZ = constrain(newZ, 0, MAXZ);
+        z = newZ;
+    }
+    void setFocus(int newFocus) {
+        newFocus = constrain(newFocus, 0, MAXF);
+        focus = newFocus;
+    }
+    void moveCamera() {
+        Serial.write(0x81);
+        Serial.write(0x01);
+        Serial.write(0x06);
+        Serial.write(0x02);
+        Serial.write(0x00);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+        Serial.write(0x01);
+    }
+
+   private:
+    int x;
+    int y;
+    int z;
+    int focus;
+};
+
+PTZCam cams[7];
 void handleSerial() {
     bool newData = false;
     char buff[17] = {0};
-    uint8_t packetSize = 0;
     while (Serial.available() > 0) {
         newData = true;
         Serial.readBytes(buff, Serial.available());
     }
     if (newData) {
         client.publish("visca/data", buff);
-        client.publish("visca/debug", "Habe Daten gemacht");
+        client.publish(mqtt_topicresult, "Habe Daten gemacht");
     }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
+    DynamicJsonBuffer response(1024);
+    JsonObject& responseObject = response.parseObject(payload);
 
-    Serial.write(payload, length);
+    if (strcmp(topic, "visca/command/raw") == 0) {
+        Serial.write(payload, length);
 
+        client.publish(mqtt_topicresult,
+                       ("Kotze Daten " + String(length)).c_str());
+    }
+    if (strcmp(topic, "visca/command/x") == 0) {
+        cams[0].setX(2);
+    }
+    if (strcmp(topic, "visca/command/blink") == 0) {
+        VISCACommand command = blink(responseObject["led"].as<uint8_t>(), responseObject["mode"].as<uint8_t>(), 0);
+        Serial.write(command.payload, command.len);
+    }
     Serial.flush();
-    client.publish("visca/debug", ("Kotze Daten " + String(length)).c_str());
 }
