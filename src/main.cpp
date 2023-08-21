@@ -17,13 +17,13 @@
 #define MAXX 1023
 #define MAXY 255
 #define MAXZ 2305
-#define MAXF 255
+#define MAXF 65535
 
 class PTZCam {
    public:
     // Constructor
-    PTZCam(int xValue = 1023 / 2, int yValue = 255 / 2, int zValue = 255 / 2,
-           int focusValue = 255 / 2)
+    PTZCam(int xValue = MAXX / 2, int yValue = MAXY / 2, int zValue = MAXZ / 2,
+           int focusValue = MAXF / 2)
         : x(xValue), y(yValue), z(zValue), focus(focusValue) {}
 
     // Getter methods
@@ -46,22 +46,8 @@ class PTZCam {
         z = newZ;
     }
     void setFocus(int newFocus) {
-        newFocus = constrain(newFocus, 0, MAXF);
+        newFocus = constrain(newFocus, -1, MAXF);
         focus = newFocus;
-    }
-    void moveCamera() {
-        Serial.write(0x81);
-        Serial.write(0x01);
-        Serial.write(0x06);
-        Serial.write(0x02);
-        Serial.write(0x00);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
-        Serial.write(0x01);
     }
 
    private:
@@ -145,19 +131,22 @@ VISCACommand movement(uint8_t cam = 0) {
     byte focusValues[4];
     convertValues(focus, focusValues);
 
-    // 0p 0q 0r 0s PAN
-    // 0t 0u 0v 0w TILT
-    // 0x 0y 0z 0g ZOOM
-    // 0h 0i 0j 0k FOCUS
+    byte cmd[] = {0x01,           0x04,
+                  0x38,           (focus == -1 ? 0x02 : 0x03),
+                  0xff,           (0x81 + cam),
+                  0x01,           0x06,
+                  0x20,           xValues[0],
+                  xValues[1],     xValues[2],
+                  xValues[3],
 
-    byte cmd[] = {
-        0x01,           0x06,           0x20,           xValues[0],
-        xValues[1],     xValues[2],     xValues[3],
-
-        yValues[0],     yValues[1],     yValues[2],     yValues[3],
-        zValues[0],     zValues[1],     zValues[2],     zValues[3],
-        focusValues[0], focusValues[1], focusValues[2], focusValues[3]};
+                  yValues[0],     yValues[1],
+                  yValues[2],     yValues[3],
+                  zValues[0],     zValues[1],
+                  zValues[2],     zValues[3],
+                  focusValues[0], focusValues[1],
+                  focusValues[2], focusValues[3]};
     VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+
     return command;
 }
 
