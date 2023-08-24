@@ -19,6 +19,8 @@ Here are some examples how to use the MQTT interface:
 - [D1 mini](https://www.wemos.cc/en/latest/d1/d1_mini.html) (any other ESP8266 will work. Haven't tested ESP32 boards yet)
 - [max3232 breakout board](https://www.makershop.de/module/schnittstellen/max3232-mini/) (The DB9 version will also work)
 
+__Somewhat important note: Do not use software serial for VISCA. Doesn't work. Makes you bang your head against the wall.__
+
 ## Resources for further development
 
 [Cisco VISCA documentation](https://www.cisco.com/c/dam/en/us/td/docs/telepresence/endpoint/camera/precisionhd/user_guide/precisionhd_1080p-720p_camera_user_guide.pdf)
