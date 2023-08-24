@@ -113,6 +113,17 @@ void convertValues(uint input, byte* output) {
     output[2] = (input >> 4) & 0x0f;
     output[3] = input & 0x0f;
 }
+VISCACommand wb(int setting = 0, uint8_t cam = 0) {
+    byte wbValues[4];
+    convertValues(setting, wbValues);
+    byte cmd[] = {
+        0x01,       0x04,        0x35,        (setting <= -1 ? 0x00 : 0x06),
+        0xff,       0x81 + cam,  0x01,        0x04,
+        0x75,       wbValues[0], wbValues[1], wbValues[2],
+        wbValues[3]};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+    return command;
+}
 VISCACommand movement(uint8_t cam = 0) {
     const uint x = cams[cam].getX();
     const uint y = cams[cam].getY();
@@ -432,6 +443,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
         //  ir_output, ir_cameracontrol
     }
 
+    if (strcmp(topic, "visca/command/picture") == 0) {
+        if (responseObject.containsKey("wb")) {
+            VISCACommand command = wb(responseObject["wb"].as<int>(),
+                                      responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+    }
     if (strcmp(topic, "visca/command/moveto") == 0) {
         if (responseObject.containsKey("x")) {
             cams[responseObject["cam"].as<uint8_t>()].setX(
