@@ -124,6 +124,18 @@ VISCACommand wb(int setting = 0, uint8_t cam = 0) {
     VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
 }
+VISCACommand iris(int8 setting = 0, uint8_t cam = 0) {
+    
+    byte irisValues[4];
+    convertValues(setting, irisValues);
+    byte cmd[] = {
+        0x01,       0x04,        0x39,        (setting <= -1 ? 0x00 : 0x03),
+        0xff,       0x81 + cam,  0x01,        0x04,
+        0x4b,       irisValues[0], irisValues[1], irisValues[2],
+        irisValues[3]};
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+    return command;
+}
 VISCACommand movement(uint8_t cam = 0) {
     const uint x = cams[cam].getX();
     const uint y = cams[cam].getY();
@@ -446,6 +458,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (strcmp(topic, "visca/command/picture") == 0) {
         if (responseObject.containsKey("wb")) {
             VISCACommand command = wb(responseObject["wb"].as<int>(),
+                                      responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+        if (responseObject.containsKey("iris")) {
+            VISCACommand command = iris(responseObject["iris"].as<int8>(),
                                       responseObject["cam"].as<uint8_t>());
             Serial.write(command.payload, command.len);
         }
