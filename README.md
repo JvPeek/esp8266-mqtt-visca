@@ -2,6 +2,7 @@
 
 ESP8266 Bridge to transfer WiFi/MQTT messages to RS232/VISCA.  
 I use Cisco PrecisionHD (TTC8-02) cameras for development. Might work with other cameras.
+![Cameras need eyes](https://raw.githubusercontent.com/JvPeek/esp8266-mqtt-visca/main/images/cams_smol.jpg)
 
 ## Usage
 
