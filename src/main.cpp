@@ -416,9 +416,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
         client.publish(mqtt_topicresult,
                        ("Kotze Daten " + String(length)).c_str());
     }
-    if (strcmp(topic, "visca/command/x") == 0) {
-        cams[0].setX(2);
-    }
     if (strcmp(topic, "visca/command/blinkenlights") == 0) {
         VISCACommand command =
             blinkenlights(responseObject["led"].as<uint8_t>(),
