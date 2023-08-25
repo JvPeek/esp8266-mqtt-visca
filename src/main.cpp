@@ -124,7 +124,7 @@ VISCACommand wb(int setting = 0, uint8_t cam = 0) {
     VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
 }
-VISCACommand iris(int8 setting = 0, uint8_t cam = 0) {
+VISCACommand iris(int setting = 0, uint8_t cam = 0) {
     
     byte irisValues[4];
     convertValues(setting, irisValues);
@@ -459,7 +459,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
             Serial.write(command.payload, command.len);
         }
         if (responseObject.containsKey("iris")) {
-            VISCACommand command = iris(responseObject["iris"].as<int8>(),
+            VISCACommand command = iris(responseObject["iris"].as<int>(),
                                       responseObject["cam"].as<uint8_t>());
             Serial.write(command.payload, command.len);
         }
