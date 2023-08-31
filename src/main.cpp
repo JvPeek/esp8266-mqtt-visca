@@ -181,8 +181,8 @@ void callback(char* topic, byte* payload, unsigned int length);
 // define your default values here, if there are different values in
 // config.json, they are overwritten. char mqtt_server[40];
 #define mqtt_server "192.168.10.15"
-#define mqtt_user "dakommtderuserrein"
-#define mqtt_password "dakommtspasswordrein"
+#define mqtt_user "user"
+#define mqtt_password "pass"
 #define mqtt_port "1883"
 #define mqtt_topic "visca/command/#"
 #define mqtt_topicresult "visca/status"
@@ -228,8 +228,8 @@ void setup() {
                     debugPrintln("\nparsed json");
                     strcpy(mqtt_server, json["mqtt_server"]);
                     strcpy(mqtt_port, json["mqtt_port"]);
-                    strcpy(mqtt_port, json["mqtt_user"]);
-                    strcpy(mqtt_port, json["mqtt_password"]);
+                    strcpy(mqtt_user, json["mqtt_user"]);
+                    strcpy(mqtt_password, json["mqtt_password"]);
                 } else {
                     debugPrintln("failed to load json config");
                 }
