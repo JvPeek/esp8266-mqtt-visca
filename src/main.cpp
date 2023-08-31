@@ -180,7 +180,9 @@ void callback(char* topic, byte* payload, unsigned int length);
 
 // define your default values here, if there are different values in
 // config.json, they are overwritten. char mqtt_server[40];
-#define mqtt_server "192.168.2.11"
+#define mqtt_server "192.168.10.15"
+#define mqtt_user "dakommtderuserrein"
+#define mqtt_password "dakommtspasswordrein"
 #define mqtt_port "1883"
 #define mqtt_topic "visca/command/#"
 #define mqtt_topicresult "visca/status"
@@ -226,6 +228,8 @@ void setup() {
                     debugPrintln("\nparsed json");
                     strcpy(mqtt_server, json["mqtt_server"]);
                     strcpy(mqtt_port, json["mqtt_port"]);
+                    strcpy(mqtt_port, json["mqtt_user"]);
+                    strcpy(mqtt_port, json["mqtt_password"]);
                 } else {
                     debugPrintln("failed to load json config");
                 }
@@ -242,7 +246,8 @@ void setup() {
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server",
                                             mqtt_server, 40);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
-
+    WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 40);
+    WiFiManagerParameter custom_mqtt_password("user", "mqtt password", mqtt_password, 40);
     // WiFiManager
     // Local intialization. Once its business is done, there is no need to keep
     // it around
@@ -263,6 +268,8 @@ void setup() {
     // add all your parameters here
     wifiManager.addParameter(&custom_mqtt_server);
     wifiManager.addParameter(&custom_mqtt_port);
+    wifiManager.addParameter(&custom_mqtt_user);
+    wifiManager.addParameter(&custom_mqtt_password);
 
     // reset settings - for testing
     // wifiManager.resetSettings();
@@ -357,7 +364,7 @@ void reconnect() {
 
         String clientId = "VISCABridge-";
         clientId += String(random(0xffff), HEX);
-        if (client.connect(clientId.c_str())) {
+        if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
             debugPrint("connected");
             client.subscribe("visca/command/#");
             client.publish(mqtt_topicresult, "ready");
