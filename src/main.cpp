@@ -247,7 +247,7 @@ void setup() {
                                             mqtt_server, 40);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
     WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 40);
-    WiFiManagerParameter custom_mqtt_password("user", "mqtt password", mqtt_password, 40);
+    WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password, 40);
     // WiFiManager
     // Local intialization. Once its business is done, there is no need to keep
     // it around
@@ -335,6 +335,8 @@ void setup() {
         JsonObject& json = jsonBuffer.createObject();
         json["mqtt_server"] = mqtt_server;
         json["mqtt_port"] = mqtt_port;
+        json["mqtt_user"] = mqtt_user;
+        json["mqtt_password"] = mqtt_password;
 
         File configFile = SPIFFS.open("/config.json", "w");
         if (!configFile) {
