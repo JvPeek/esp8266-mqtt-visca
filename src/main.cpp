@@ -18,8 +18,9 @@
 #define MAXY 212
 #define MAXZ 2305
 #define MAXF 65535
-
-
+#define NUM_CAMS 7
+void requestEverything();
+long lastRequestTime = 0;
 class PTZCam {
    public:
     // Constructor
@@ -58,7 +59,7 @@ class PTZCam {
     int focus;
 };
 
-PTZCam cams[7];
+PTZCam cams[NUM_CAMS];
 
 void debugPrint(String prompt) {}
 void debugPrintln(String prompt) { debugPrint(prompt + "\n"); }
@@ -162,8 +163,9 @@ VISCACommand relativeMovement(int x, int y, uint8_t cam = 0) {
     byte panSpeed = map(abs(x), 0, 100, 0x00, 0x1f);
     byte tiltSpeed = map(abs(y), 0, 100, 0x00, 0x1f);
 
-    byte cmd[] = {0x01, 0x06, 0x01, 0x00, 0x00, 0x03, 0x03, 0xff, 0x81+cam, 0x01,      0x06,         0x01,         panSpeed,
-                  tiltSpeed, panDirection, tiltDirection};
+    byte cmd[] = {0x01,     0x06,      0x01,         0x00,         0x00, 0x03,
+                  0x03,     0xff,      0x81 + cam,   0x01,         0x06, 0x01,
+                  panSpeed, tiltSpeed, panDirection, tiltDirection};
     VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
 }
@@ -413,20 +415,27 @@ void loop() {
     client.loop();
     ArduinoOTA.handle();
     handleSerial();
+    if (lastRequestTime + 1000 < millis()) {
+        lastRequestTime = millis();
+        requestEverything();
+    }
 }
-void parseCommand(char* command) {
-
-    client.publish("viscadev/return/raw", command);
-    
+void parseCommand(uint8_t* command, int length) {
+    if (command[0] == 0x90 && command[1] == 0x50 &&
+        command[2] == 0xFF) {
+        return;
+    }
+    client.publish("viscadev/return/raw", command, length);
+    client.publish("viscadev/return/length", String(length).c_str());
 }
 void handleSerial() {
     static enum { IDLE, RECEIVING } state = IDLE;
-    static char buff[17] = {0};
+    static uint8_t buff[17] = {0};
     static int buffIndex = 0;
-    
+
     while (Serial.available() > 0) {
-        char receivedByte = Serial.read();
-        
+        uint8_t receivedByte = Serial.read();
+
         switch (state) {
             case IDLE:
                 if (receivedByte == 0x90) {
@@ -435,19 +444,27 @@ void handleSerial() {
                     buff[buffIndex++] = receivedByte;
                 }
                 break;
-                
+
             case RECEIVING:
                 buff[buffIndex++] = receivedByte;
                 if (receivedByte == 0xff) {
                     // Full command received, call parseCommand
-                    parseCommand(buff);
+                    parseCommand(buff, buffIndex);
                     state = IDLE;
                 }
                 break;
         }
     }
 }
-
+void requestEverything() {
+    // 8x 09 06 12 ff request PT
+    //
+    byte cmd[] = {0x81, 0x09, 0x06, 0x12, 0xFF};
+    for (uint8_t i = 0; i < NUM_CAMS; i++) {
+        cmd[0] = 0x81 + i;
+        Serial.write(cmd, sizeof(cmd));
+    }
+}
 void callback(char* topic, byte* payload, unsigned int length) {
     DynamicJsonBuffer response(1024);
     JsonObject& responseObject = response.parseObject(payload);
@@ -545,8 +562,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
         Serial.write(command.payload, command.len);
         client.publish("viscadev/rawdata", command.payload, command.len);
-
-        
     }
     Serial.flush();
 }
