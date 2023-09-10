@@ -13,12 +13,15 @@
 #include <SoftwareSerial.h>
 #include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
 #include <WiFiUdp.h>
+
 #include <camera.h>
 #include <commands.h>
+
 
 void debugPrint(String prompt) {}
 void debugPrintln(String prompt) { debugPrint(prompt + "\n"); }
 void handleSerial();
+
 
 long lastRequestTime = 0;
 
@@ -34,7 +37,6 @@ void callback(char* topic, byte* payload, unsigned int length);
 #define mqtt_user "user"
 #define mqtt_password "pass"
 #define mqtt_basetopic "Community/VISCA"
-
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -227,6 +229,7 @@ void reconnect() {
         clientId += String(random(0xffff), HEX);
         if (client.connect(clientId.c_str())) {
             debugPrint("connected");
+
             client.subscribe(buildTopic("#").c_str());
             client.publish(buildTopic("status").c_str(), "ready");
 
@@ -255,8 +258,10 @@ void parseCommand(uint8_t* command, int length) {
         command[2] == 0xFF) {
         return;
     }
+
     client.publish(buildTopic("return/raw").c_str(), command, length);
     client.publish(buildTopic("return/length").c_str(), String(length).c_str());
+
 }
 void handleSerial() {
     static enum { IDLE, RECEIVING } state = IDLE;
@@ -284,9 +289,9 @@ void handleSerial() {
                 }
                 break;
         }
+
     }
 }
-
 void callback(char* topic, byte* payload, unsigned int length) {
     DynamicJsonBuffer response(1024);
     JsonObject& responseObject = response.parseObject(payload);
@@ -297,18 +302,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
     uint8_t camNum = responseObject["cam"].as<uint8_t>();
 
     if (strcmp(topic, buildTopic("command/raw").c_str()) == 0) {
+
         Serial.write(payload, length);
         client.publish(buildTopic("status").c_str(),
                        ("Kotze Daten " + String(length)).c_str());
     }
+
     if (strcmp(topic, buildTopic("command/blinkenlights").c_str()) == 0) {
+
         VISCACommand command =
             blinkenlights(responseObject["led"].as<uint8_t>(),
                           responseObject["mode"].as<uint8_t>(),
                           responseObject["cam"].as<uint8_t>());
         Serial.write(command.payload, command.len);
     }
+
     if (strcmp(topic, buildTopic("command/settings").c_str()) == 0) {
+
         if (responseObject.containsKey("backlight")) {
             VISCACommand command =
                 backlight(responseObject["backlight"].as<bool>(),
@@ -337,7 +347,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
         //  ir_output, ir_cameracontrol
     }
 
+
     if (strcmp(topic, buildTopic("command/picture").c_str()) == 0) {
+
         if (responseObject.containsKey("wb")) {
             VISCACommand command = wb(responseObject["wb"].as<int>(),
                                       responseObject["cam"].as<uint8_t>());
@@ -349,7 +361,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
             Serial.write(command.payload, command.len);
         }
     }
+
     if (strcmp(topic, buildTopic("command/moveto").c_str()) == 0) {
+
         if (responseObject.containsKey("x")) {
             cams[responseObject["cam"].as<uint8_t>()].setX(
                 responseObject["x"].as<int>());
@@ -371,7 +385,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
         Serial.write(command.payload, command.len);
     }
 
+
     if (strcmp(topic, buildTopic("command/moveby").c_str()) == 0) {
+
         if (!responseObject.containsKey("x")) {
             responseObject.set("x", 0);
         }
@@ -384,7 +400,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
             responseObject["cam"].as<uint8_t>());
 
         Serial.write(command.payload, command.len);
+
         client.publish(buildTopic("rawdata").c_str(), command.payload, command.len);
+
     }
     Serial.flush();
 }
