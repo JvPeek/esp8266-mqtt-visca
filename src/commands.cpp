@@ -102,7 +102,6 @@ VISCACommand relativeMovement(int x, int y, uint8_t cam) {
     return command;
 }
 VISCACommand movement(uint8_t cam) {
-    Serial.println(cams[cam].getX());
     const uint x = cams[cam].getX();
     const uint y = cams[cam].getY();
     const uint z = cams[cam].getZ();

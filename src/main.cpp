@@ -20,6 +20,8 @@ void debugPrint(String prompt) {}
 void debugPrintln(String prompt) { debugPrint(prompt + "\n"); }
 void handleSerial();
 
+long lastRequestTime = 0;
+
 // flag for saving data
 bool shouldSaveConfig = false;
 
@@ -243,7 +245,10 @@ void loop() {
     client.loop();
     ArduinoOTA.handle();
     handleSerial();
-
+    if (lastRequestTime + 1000 < millis()) {
+        lastRequestTime = millis();
+        requestEverything();
+    }
 }
 void parseCommand(uint8_t* command, int length) {
     if (command[0] == 0x90 && command[1] == 0x50 &&
