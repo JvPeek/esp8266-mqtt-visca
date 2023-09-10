@@ -13,165 +13,12 @@
 #include <SoftwareSerial.h>
 #include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
 #include <WiFiUdp.h>
-
-#define MAXX 1023
-#define MAXY 255
-#define MAXZ 2305
-#define MAXF 65535
-
-class PTZCam {
-   public:
-    // Constructor
-    PTZCam(int xValue = MAXX / 2, int yValue = MAXY / 2, int zValue = MAXZ / 2,
-           int focusValue = MAXF / 2)
-        : x(xValue), y(yValue), z(zValue), focus(focusValue) {}
-
-    // Getter methods
-    int getX() const { return x; }
-    int getY() const { return y; }
-    int getZ() const { return z; }
-    int getFocus() const { return focus; }
-
-    // Setter methods
-    void setX(int newX) {
-        newX = constrain(newX, 0, MAXX);
-        x = newX;
-    }
-    void setY(int newY) {
-        newY = constrain(newY, 0, MAXY);
-        y = newY;
-    }
-    void setZ(int newZ) {
-        newZ = constrain(newZ, 0, MAXZ);
-        z = newZ;
-    }
-    void setFocus(int newFocus) {
-        newFocus = constrain(newFocus, -1, MAXF);
-        focus = newFocus;
-    }
-
-   private:
-    int x;
-    int y;
-    int z;
-    int focus;
-};
-
-PTZCam cams[7];
+#include <camera.h>
+#include <commands.h>
 
 void debugPrint(String prompt) {}
 void debugPrintln(String prompt) { debugPrint(prompt + "\n"); }
 void handleSerial();
-
-#define VISCACOMMAND_MAX_LENGTH 128
-
-struct VISCACommand {
-    uint8_t len;
-    uint8_t payload[VISCACOMMAND_MAX_LENGTH];
-};
-
-VISCACommand makePackage(byte* payload, uint8_t length, uint8_t camNum) {
-    VISCACommand cmd;
-    uint8_t charCount = 0;
-    cmd.payload[charCount++] = 0x81 + camNum;
-    for (uint8_t i = 0; i < length; i++) {
-        cmd.payload[charCount++] = payload[i];
-    }
-    cmd.payload[charCount++] = 0xFF;
-    cmd.len = charCount;
-    return cmd;
-}
-VISCACommand blinkenlights(uint8_t led = 0, uint8_t mode = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x33, led, mode};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-
-VISCACommand flip(bool setting = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x04, 0x66, (setting ? 0x02 : 0x03)};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-VISCACommand mirror(bool setting = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x04, 0x61, (setting ? 0x02 : 0x03)};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-VISCACommand backlight(bool setting = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x04, 0x33, 0x02, (setting ? 0x02 : 0x03)};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-VISCACommand mmdetect(bool setting = 0, uint8_t cam = 0) {
-    byte cmd[] = {0x01, 0x50, 0x30, 0x01, setting};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-void convertValues(uint input, byte* output) {
-    output[0] = (input >> 12) & 0x0f;
-    output[1] = (input >> 8) & 0x0f;
-    output[2] = (input >> 4) & 0x0f;
-    output[3] = input & 0x0f;
-}
-VISCACommand wb(int setting = 0, uint8_t cam = 0) {
-    byte wbValues[4];
-    convertValues(setting, wbValues);
-    byte cmd[] = {
-        0x01,       0x04,        0x35,        (setting <= -1 ? 0x00 : 0x06),
-        0xff,       0x81 + cam,  0x01,        0x04,
-        0x75,       wbValues[0], wbValues[1], wbValues[2],
-        wbValues[3]};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-VISCACommand iris(int8 setting = 0, uint8_t cam = 0) {
-    
-    byte irisValues[4];
-    convertValues(setting, irisValues);
-    byte cmd[] = {
-        0x01,       0x04,        0x39,        (setting <= -1 ? 0x00 : 0x03),
-        0xff,       0x81 + cam,  0x01,        0x04,
-        0x4b,       irisValues[0], irisValues[1], irisValues[2],
-        irisValues[3]};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-    return command;
-}
-VISCACommand movement(uint8_t cam = 0) {
-    const uint x = cams[cam].getX();
-    const uint y = cams[cam].getY();
-    const uint z = cams[cam].getZ();
-    const uint focus = cams[cam].getFocus();
-
-    byte xValues[4];
-    convertValues(x, xValues);
-
-    byte yValues[4];
-    convertValues(y, yValues);
-
-    byte zValues[4];
-    convertValues(z, zValues);
-
-    byte focusValues[4];
-    convertValues(focus, focusValues);
-
-    byte cmd[] = {0x01,           0x04,
-                  0x38,           (focus == -1 ? 0x02 : 0x03),
-                  0xff,           (0x81 + cam),
-                  0x01,           0x06,
-                  0x20,           xValues[0],
-                  xValues[1],     xValues[2],
-                  xValues[3],
-
-                  yValues[0],     yValues[1],
-                  yValues[2],     yValues[3],
-                  zValues[0],     zValues[1],
-                  zValues[2],     zValues[3],
-                  focusValues[0], focusValues[1],
-                  focusValues[2], focusValues[3]};
-    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
-
-    return command;
-}
 
 // flag for saving data
 bool shouldSaveConfig = false;
@@ -180,10 +27,12 @@ void callback(char* topic, byte* payload, unsigned int length);
 
 // define your default values here, if there are different values in
 // config.json, they are overwritten. char mqtt_server[40];
-#define mqtt_server "192.168.2.11"
+#define mqtt_server "10.0.10.30"
 #define mqtt_port "1883"
-#define mqtt_topic "visca/command/#"
-#define mqtt_topicresult "visca/status"
+#define mqtt_user "user"
+#define mqtt_password "pass"
+#define mqtt_basetopic "Community/VISCA"
+
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -226,6 +75,9 @@ void setup() {
                     debugPrintln("\nparsed json");
                     strcpy(mqtt_server, json["mqtt_server"]);
                     strcpy(mqtt_port, json["mqtt_port"]);
+                    strcpy(mqtt_user, json["mqtt_user"]);
+                    strcpy(mqtt_password, json["mqtt_password"]);
+                    strcpy(mqtt_basetopic, json["mqtt_basetopic"]);
                 } else {
                     debugPrintln("failed to load json config");
                 }
@@ -242,7 +94,9 @@ void setup() {
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server",
                                             mqtt_server, 40);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
-
+    WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 40);
+    WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password, 40);
+    WiFiManagerParameter custom_mqtt_basetopic("basetopic", "mqtt basetopic", mqtt_basetopic, 128);
     // WiFiManager
     // Local intialization. Once its business is done, there is no need to keep
     // it around
@@ -257,12 +111,16 @@ void setup() {
     // wifiManager.resetSettings();
 
     // set static ip
-    //  wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99),
+    //  wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99),platform = esp
+
     //  IPAddress(10,0,1,1), IPAddress(255,255,255,0));
 
     // add all your parameters here
     wifiManager.addParameter(&custom_mqtt_server);
     wifiManager.addParameter(&custom_mqtt_port);
+    wifiManager.addParameter(&custom_mqtt_user);
+    wifiManager.addParameter(&custom_mqtt_password);
+    wifiManager.addParameter(&custom_mqtt_basetopic);
 
     // reset settings - for testing
     // wifiManager.resetSettings();
@@ -280,7 +138,7 @@ void setup() {
     // if it does not connect it starts an access point with the specified name
     // here  "AutoConnectAP"
     // and goes into a blocking loop awaiting configuration
-    if (!wifiManager.autoConnect("AutoConnectAP", "password")) {
+    if (!wifiManager.autoConnect("KatzenWuerden", "viscakaufen")) {
         debugPrintln("failed to connect and hit timeout");
         delay(3000);
         // reset and try again, or maybe put it to deep sleep
@@ -328,6 +186,9 @@ void setup() {
         JsonObject& json = jsonBuffer.createObject();
         json["mqtt_server"] = mqtt_server;
         json["mqtt_port"] = mqtt_port;
+        json["mqtt_user"] = mqtt_user;
+        json["mqtt_password"] = mqtt_password;
+        json["mqtt_basetopic"] = mqtt_basetopic;
 
         File configFile = SPIFFS.open("/config.json", "w");
         if (!configFile) {
@@ -346,6 +207,11 @@ void setup() {
     client.setCallback(callback);
 }
 
+String buildTopic(const char* subTopic) {
+    String newTopic = String(mqtt_basetopic) + "/" + String(subTopic);
+    return newTopic;
+}
+
 void reconnect() {
     // Loop until we're reconnected
     while (!client.connected()) {
@@ -359,8 +225,8 @@ void reconnect() {
         clientId += String(random(0xffff), HEX);
         if (client.connect(clientId.c_str())) {
             debugPrint("connected");
-            client.subscribe("visca/command/#");
-            client.publish(mqtt_topicresult, "ready");
+            client.subscribe(buildTopic("#").c_str());
+            client.publish(buildTopic("status").c_str(), "ready");
 
         } else {
             debugPrint("failed, rc=");
@@ -377,53 +243,67 @@ void loop() {
     client.loop();
     ArduinoOTA.handle();
     handleSerial();
+
 }
-
-/* todo:
-
-PAN / TILT
-ZOOM
-FOCUS
-FLIP
-
-LED ON/OFF/BLINK
-
-*/
-
-void handleSerial() {
-    bool newData = false;
-    char buff[17] = {0};
-    while (Serial.available() > 0) {
-        newData = true;
-        Serial.readBytes(buff, Serial.available());
+void parseCommand(uint8_t* command, int length) {
+    if (command[0] == 0x90 && command[1] == 0x50 &&
+        command[2] == 0xFF) {
+        return;
     }
-    if (newData) {
-        client.publish("visca/data", buff);
-        client.publish(mqtt_topicresult, "Habe Daten gemacht");
+    client.publish(buildTopic("return/raw").c_str(), command, length);
+    client.publish(buildTopic("return/length").c_str(), String(length).c_str());
+}
+void handleSerial() {
+    static enum { IDLE, RECEIVING } state = IDLE;
+    static uint8_t buff[17] = {0};
+    static int buffIndex = 0;
+
+    while (Serial.available() > 0) {
+        uint8_t receivedByte = Serial.read();
+
+        switch (state) {
+            case IDLE:
+                if (receivedByte == 0x90) {
+                    state = RECEIVING;
+                    buffIndex = 0;
+                    buff[buffIndex++] = receivedByte;
+                }
+                break;
+
+            case RECEIVING:
+                buff[buffIndex++] = receivedByte;
+                if (receivedByte == 0xff) {
+                    // Full command received, call parseCommand
+                    parseCommand(buff, buffIndex);
+                    state = IDLE;
+                }
+                break;
+        }
     }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
     DynamicJsonBuffer response(1024);
     JsonObject& responseObject = response.parseObject(payload);
+    Serial.println(responseObject["cam"].as<uint8_t>());
     if (!responseObject.containsKey("cam")) {
         responseObject.set("cam", 0);
     }
     uint8_t camNum = responseObject["cam"].as<uint8_t>();
 
-    if (strcmp(topic, "visca/command/raw") == 0) {
+    if (strcmp(topic, buildTopic("command/raw").c_str()) == 0) {
         Serial.write(payload, length);
-        client.publish(mqtt_topicresult,
+        client.publish(buildTopic("status").c_str(),
                        ("Kotze Daten " + String(length)).c_str());
     }
-    if (strcmp(topic, "visca/command/blinkenlights") == 0) {
+    if (strcmp(topic, buildTopic("command/blinkenlights").c_str()) == 0) {
         VISCACommand command =
             blinkenlights(responseObject["led"].as<uint8_t>(),
                           responseObject["mode"].as<uint8_t>(),
                           responseObject["cam"].as<uint8_t>());
         Serial.write(command.payload, command.len);
     }
-    if (strcmp(topic, "visca/command/settings") == 0) {
+    if (strcmp(topic, buildTopic("command/settings").c_str()) == 0) {
         if (responseObject.containsKey("backlight")) {
             VISCACommand command =
                 backlight(responseObject["backlight"].as<bool>(),
@@ -452,19 +332,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
         //  ir_output, ir_cameracontrol
     }
 
-    if (strcmp(topic, "visca/command/picture") == 0) {
+    if (strcmp(topic, buildTopic("command/picture").c_str()) == 0) {
         if (responseObject.containsKey("wb")) {
             VISCACommand command = wb(responseObject["wb"].as<int>(),
                                       responseObject["cam"].as<uint8_t>());
             Serial.write(command.payload, command.len);
         }
         if (responseObject.containsKey("iris")) {
-            VISCACommand command = iris(responseObject["iris"].as<int8>(),
-                                      responseObject["cam"].as<uint8_t>());
+            VISCACommand command = iris(responseObject["iris"].as<int>(),
+                                        responseObject["cam"].as<uint8_t>());
             Serial.write(command.payload, command.len);
         }
     }
-    if (strcmp(topic, "visca/command/moveto") == 0) {
+    if (strcmp(topic, buildTopic("command/moveto").c_str()) == 0) {
         if (responseObject.containsKey("x")) {
             cams[responseObject["cam"].as<uint8_t>()].setX(
                 responseObject["x"].as<int>());
@@ -486,7 +366,20 @@ void callback(char* topic, byte* payload, unsigned int length) {
         Serial.write(command.payload, command.len);
     }
 
-    if (strcmp(topic, "visca/command/moveby") == 0) {
+    if (strcmp(topic, buildTopic("command/moveby").c_str()) == 0) {
+        if (!responseObject.containsKey("x")) {
+            responseObject.set("x", 0);
+        }
+        if (!responseObject.containsKey("y")) {
+            responseObject.set("y", 0);
+        }
+
+        VISCACommand command = relativeMovement(
+            responseObject["x"].as<int>(), responseObject["y"].as<int>(),
+            responseObject["cam"].as<uint8_t>());
+
+        Serial.write(command.payload, command.len);
+        client.publish(buildTopic("rawdata").c_str(), command.payload, command.len);
     }
     Serial.flush();
 }
