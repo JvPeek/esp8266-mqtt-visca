@@ -4,4 +4,5 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode/
+data/config.json
 orig/
