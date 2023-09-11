@@ -12,6 +12,8 @@ void parseCommand(uint8_t* command, int length);
 void requestEverything();
 void handleSerial();
 
+void handleCommands(char* topic, byte* payload, unsigned int length);
+
 VISCACommand makePackage(byte* payload, uint8_t length, uint8_t camNum);
 VISCACommand blinkenlights(uint8_t led = 0, uint8_t mode = 0, uint8_t cam = 0);
 VISCACommand flip(bool setting = 0, uint8_t cam = 0);

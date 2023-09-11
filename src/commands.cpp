@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <camera.h>
 #include <commands.h>
+#include <ArduinoJson.h>
+#include <FS.h>
 
 PTZCam cams[NUM_CAMS];
 
-
+/*VISCA Commands*/
 VISCACommand makePackage(byte* payload, uint8_t length, uint8_t camNum) {
     VISCACommand cmd;
     uint8_t charCount = 0;
@@ -152,3 +154,163 @@ void requestEverything() {
     }
 }
 
+/*System Commands*/
+void handleCommands(char* topic, byte* payload, unsigned int length){
+    /*DynamicJsonBuffer response(1024);
+    JsonObject& responseObject = response.parseObject(payload);
+    if (!responseObject.containsKey("cam")) {
+        responseObject.set("cam", 0);
+    }
+    uint8_t camNum = responseObject["cam"].as<uint8_t>();
+
+    if (strcmp(topic, buildTopic("command/raw").c_str()) == 0) {
+
+        Serial.write(payload, length);
+        client.publish(buildTopic("status").c_str(),
+                       ("Kotze Daten " + String(length)).c_str());
+    }
+
+    if (strcmp(topic, buildTopic("command/blinkenlights").c_str()) == 0) {
+
+        VISCACommand command =
+            blinkenlights(responseObject["led"].as<uint8_t>(),
+                          responseObject["mode"].as<uint8_t>(),
+                          responseObject["cam"].as<uint8_t>());
+        Serial.write(command.payload, command.len);
+    }
+
+    if (strcmp(topic, buildTopic("command/settings").c_str()) == 0) {
+
+        if (responseObject.containsKey("backlight")) {
+            VISCACommand command =
+                backlight(responseObject["backlight"].as<bool>(),
+                          responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+
+        if (responseObject.containsKey("mirror")) {
+            VISCACommand command = mirror(responseObject["mirror"].as<bool>(),
+                                          responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+        if (responseObject.containsKey("flip")) {
+            VISCACommand command = flip(responseObject["flip"].as<bool>(),
+                                        responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+
+        if (responseObject.containsKey("mmdetect")) {
+            VISCACommand command =
+                mmdetect(responseObject["mmdetect"].as<bool>(),
+                         responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+
+        //  ir_output, ir_cameracontrol
+    }
+
+
+    if (strcmp(topic, buildTopic("command/picture").c_str()) == 0) {
+
+        if (responseObject.containsKey("wb")) {
+            VISCACommand command = wb(responseObject["wb"].as<int>(),
+                                      responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+        if (responseObject.containsKey("iris")) {
+            VISCACommand command = iris(responseObject["iris"].as<int>(),
+                                        responseObject["cam"].as<uint8_t>());
+            Serial.write(command.payload, command.len);
+        }
+    }
+
+    if (strcmp(topic, buildTopic("command/moveto").c_str()) == 0) {
+
+        if (responseObject.containsKey("x")) {
+            cams[responseObject["cam"].as<uint8_t>()].setX(
+                responseObject["x"].as<int>());
+        }
+        if (responseObject.containsKey("y")) {
+            cams[responseObject["cam"].as<uint8_t>()].setY(
+                responseObject["y"].as<int>());
+        }
+        if (responseObject.containsKey("z")) {
+            cams[responseObject["cam"].as<uint8_t>()].setZ(
+                responseObject["z"].as<int>());
+        }
+        if (responseObject.containsKey("focus")) {
+            cams[responseObject["cam"].as<uint8_t>()].setFocus(
+                responseObject["focus"].as<int>());
+        }
+        VISCACommand command = movement(responseObject["cam"].as<uint8_t>());
+
+        Serial.write(command.payload, command.len);
+    }
+
+
+    if (strcmp(topic, buildTopic("command/moveby").c_str()) == 0) {
+
+        if (!responseObject.containsKey("x")) {
+            responseObject.set("x", 0);
+        }
+        if (!responseObject.containsKey("y")) {
+            responseObject.set("y", 0);
+        }
+
+        VISCACommand command = relativeMovement(
+            responseObject["x"].as<int>(), responseObject["y"].as<int>(),
+            responseObject["cam"].as<uint8_t>());
+
+        Serial.write(command.payload, command.len);
+
+        client.publish(buildTopic("rawdata").c_str(), command.payload, command.len);
+
+    }
+    if (strcmp(topic, buildTopic("command/resetConfig").c_str()) == 0) {
+        if (responseObject.containsKey("reset")) {
+            Serial.println(String(responseObject["reset"]));
+            // && responseObject["reset"]
+            //ESP.eraseConfig();
+        }
+        
+    }
+    if (strcmp(topic, buildTopic("command/updateConfig").c_str()) == 0) {
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.createObject();
+        File configFile = SPIFFS.open("/config.json", "w");
+        if (!configFile) {
+            debugPrintln("failed to open config file for writing");
+        } else {
+            if (responseObject.containsKey("mqtt_server")) {
+                json["mqtt_server"] = responseObject["mqtt_server"];
+            } else {
+                json["mqtt_server"] = mqtt_server;
+            }
+            if (responseObject.containsKey("mqtt_port")) {
+                json["mqtt_port"] = responseObject["mqtt_port"];
+            } else {
+                json["mqtt_port"] = mqtt_port;
+            }
+            if (responseObject.containsKey("mqtt_user")) {
+                json["mqtt_user"] = responseObject["mqtt_user"];
+            } else {
+                json["mqtt_user"] = mqtt_user;
+            }
+            if (responseObject.containsKey("mqtt_password")) {
+                json["mqtt_password"] = responseObject["mqtt_password"];
+            } else {
+                json["mqtt_password"] = mqtt_password;
+            }
+            if (responseObject.containsKey("mqtt_basetopic")) {
+                json["mqtt_basetopic"] = responseObject["mqtt_basetopic"];
+            } else {
+                json["mqtt_basetopic"] = mqtt_basetopic;
+            }
+            json.printTo(Serial);
+            json.printTo(configFile);
+        }
+        configFile.close();
+        delay(2000);
+        ESP.restart();
+    }*/
+}

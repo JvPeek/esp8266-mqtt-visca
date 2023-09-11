@@ -32,11 +32,11 @@ void callback(char* topic, byte* payload, unsigned int length);
 
 // define your default values here, if there are different values in
 // config.json, they are overwritten. char mqtt_server[40];
-#define mqtt_server "10.0.10.30"
-#define mqtt_port "1883"
-#define mqtt_user "user"
-#define mqtt_password "pass"
-#define mqtt_basetopic "Community/VISCA"
+String mqtt_server;
+uint16_t  mqtt_port;
+String mqtt_user;
+String mqtt_password;
+String mqtt_basetopic;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -74,14 +74,15 @@ void setup() {
                 configFile.readBytes(buf.get(), size);
                 DynamicJsonBuffer jsonBuffer;
                 JsonObject& json = jsonBuffer.parseObject(buf.get());
-                json.printTo(Serial);
+                //Old dump into Serial
+                //json.printTo(Serial);
                 if (json.success()) {
                     debugPrintln("\nparsed json");
-                    strcpy(mqtt_server, json["mqtt_server"]);
-                    strcpy(mqtt_port, json["mqtt_port"]);
-                    strcpy(mqtt_user, json["mqtt_user"]);
-                    strcpy(mqtt_password, json["mqtt_password"]);
-                    strcpy(mqtt_basetopic, json["mqtt_basetopic"]);
+                    mqtt_server = String(json["mqtt_server"]);
+                    mqtt_port = String(json["mqtt_port"]).toInt();
+                    mqtt_user = String(json["mqtt_user"]);
+                    mqtt_password = String(json["mqtt_password"]);
+                    mqtt_basetopic = String(json["mqtt_basetopic"]);
                 } else {
                     debugPrintln("failed to load json config");
                 }
@@ -95,12 +96,12 @@ void setup() {
     // The extra parameters to be configured (can be either global or just in
     // the setup) After connecting, parameter.getValue() will get you the
     // configured value id/name placeholder/prompt default length
-    WiFiManagerParameter custom_mqtt_server("server", "mqtt server",
-                                            mqtt_server, 40);
-    WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
-    WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 40);
-    WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password, 40);
-    WiFiManagerParameter custom_mqtt_basetopic("basetopic", "mqtt basetopic", mqtt_basetopic, 128);
+    WiFiManagerParameter custom_mqtt_server("server", "mqtt server",mqtt_server.c_str(), 40);
+    WiFiManagerParameter custom_mqtt_port("port", "mqtt port", String(mqtt_port).c_str(), 6);
+    WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user.c_str(), 40);
+    WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password.c_str(), 40);
+    WiFiManagerParameter custom_mqtt_basetopic("basetopic", "mqtt basetopic", "VISCA", 128);
+
     // WiFiManager
     // Local intialization. Once its business is done, there is no need to keep
     // it around
@@ -110,7 +111,6 @@ void setup() {
     //  wifiManager.resetSettings();
     // set config save notify callback
     wifiManager.setSaveConfigCallback(saveConfigCallback);
-
     // SPIFFS.format();
     // wifiManager.resetSettings();
 
@@ -125,7 +125,7 @@ void setup() {
     wifiManager.addParameter(&custom_mqtt_user);
     wifiManager.addParameter(&custom_mqtt_password);
     wifiManager.addParameter(&custom_mqtt_basetopic);
-
+    
     // reset settings - for testing
     // wifiManager.resetSettings();
 
@@ -152,7 +152,6 @@ void setup() {
 
     // if you get here you have connected to the WiFi
     debugPrintln("connected...yeey :)");
-
     // Port defaults to 8266
     // ArduinoOTA.setPort(8266);
 
@@ -180,38 +179,41 @@ void setup() {
     ArduinoOTA.begin();
 
     // read updated parameters
-    strcpy(mqtt_server, custom_mqtt_server.getValue());
-    strcpy(mqtt_port, custom_mqtt_port.getValue());
+    mqtt_server = custom_mqtt_server.getValue();
+    mqtt_port = String(custom_mqtt_port.getValue()).toInt();
 
     // save the custom parameters to FS
     if (shouldSaveConfig) {
         debugPrintln("saving config");
         DynamicJsonBuffer jsonBuffer;
         JsonObject& json = jsonBuffer.createObject();
-        json["mqtt_server"] = mqtt_server;
-        json["mqtt_port"] = mqtt_port;
-        json["mqtt_user"] = mqtt_user;
-        json["mqtt_password"] = mqtt_password;
-        json["mqtt_basetopic"] = mqtt_basetopic;
+        json["mqtt_server"] = custom_mqtt_server.getValue();
+        json["mqtt_port"] = custom_mqtt_port.getValue();
+        json["mqtt_user"] = custom_mqtt_user.getValue();
+        json["mqtt_password"] = custom_mqtt_password.getValue();
+        json["mqtt_basetopic"] = custom_mqtt_basetopic.getValue();
 
         File configFile = SPIFFS.open("/config.json", "w");
         if (!configFile) {
             debugPrintln("failed to open config file for writing");
         }
 
-        json.printTo(Serial);
+        //json.printTo(Serial);
         json.printTo(configFile);
         configFile.close();
         // end save
     }
     debugPrintln("local ip");
-    const uint16_t mqtt_port_x = 1883;
-    client.setServer(mqtt_server, mqtt_port_x);
+    //uint16_t mqtt_port_x = 1883;
+    client.setServer(mqtt_server.c_str(), mqtt_port);
 
     client.setCallback(callback);
 }
 
 String buildTopic(const char* subTopic) {
+    if(mqtt_basetopic == ""){
+        mqtt_basetopic = "VISCA";
+    }
     String newTopic = String(mqtt_basetopic) + "/" + String(subTopic);
     return newTopic;
 }
@@ -231,7 +233,7 @@ void reconnect() {
             debugPrint("connected");
 
             client.subscribe(buildTopic("#").c_str());
-            client.publish(buildTopic("status").c_str(), "ready");
+            client.publish(buildTopic("system/status").c_str(), "ready");
 
         } else {
             debugPrint("failed, rc=");
@@ -259,8 +261,8 @@ void parseCommand(uint8_t* command, int length) {
         return;
     }
 
-    client.publish(buildTopic("return/raw").c_str(), command, length);
-    client.publish(buildTopic("return/length").c_str(), String(length).c_str());
+    client.publish(buildTopic("return/camera/raw").c_str(), command, length);
+    client.publish(buildTopic("return/camera/length").c_str(), String(length).c_str());
 
 }
 void handleSerial() {
@@ -293,15 +295,16 @@ void handleSerial() {
     }
 }
 void callback(char* topic, byte* payload, unsigned int length) {
+    /*Preparation for sourcing out into commands.cpp*/
+    //handleCommands(topic, payload, length);
     DynamicJsonBuffer response(1024);
     JsonObject& responseObject = response.parseObject(payload);
-    Serial.println(responseObject["cam"].as<uint8_t>());
     if (!responseObject.containsKey("cam")) {
         responseObject.set("cam", 0);
     }
     uint8_t camNum = responseObject["cam"].as<uint8_t>();
 
-    if (strcmp(topic, buildTopic("command/raw").c_str()) == 0) {
+    if (strcmp(topic, buildTopic("command/camera/raw").c_str()) == 0) {
 
         Serial.write(payload, length);
         client.publish(buildTopic("status").c_str(),
@@ -348,7 +351,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
 
-    if (strcmp(topic, buildTopic("command/picture").c_str()) == 0) {
+    if (strcmp(topic, buildTopic("command/camera/picture").c_str()) == 0) {
 
         if (responseObject.containsKey("wb")) {
             VISCACommand command = wb(responseObject["wb"].as<int>(),
@@ -362,7 +365,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
     }
 
-    if (strcmp(topic, buildTopic("command/moveto").c_str()) == 0) {
+    if (strcmp(topic, buildTopic("command/camera/moveto").c_str()) == 0) {
 
         if (responseObject.containsKey("x")) {
             cams[responseObject["cam"].as<uint8_t>()].setX(
@@ -386,7 +389,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
 
-    if (strcmp(topic, buildTopic("command/moveby").c_str()) == 0) {
+    if (strcmp(topic, buildTopic("command/camera/moveby").c_str()) == 0) {
 
         if (!responseObject.containsKey("x")) {
             responseObject.set("x", 0);
@@ -403,6 +406,70 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
         client.publish(buildTopic("rawdata").c_str(), command.payload, command.len);
 
+    }
+    if (strcmp(topic, buildTopic("command/system/resetConfig").c_str()) == 0) {
+        if (responseObject.containsKey("reset") && responseObject["reset"]) {
+            client.publish(buildTopic("return/system").c_str(),"Device configuration deleted");
+            ESP.eraseConfig();
+            delay(2000);
+            ESP.restart();
+        }
+        
+    }
+    if (strcmp(topic, buildTopic("command/system/updateConfig").c_str()) == 0) {
+        File existingConfigFile = SPIFFS.open("/config.json", "r");
+        File newConfigFile = SPIFFS.open("/config.json", "r+");
+        //JSON-Object from storage
+        size_t size = existingConfigFile.size();
+        std::unique_ptr<char[]> buf(new char[size]);
+        existingConfigFile.readBytes(buf.get(), size);
+        DynamicJsonBuffer existingBuffer;
+        JsonObject& existingConfigObject = existingBuffer.parseObject(buf.get());
+        responseObject.remove("cam");
+        existingConfigFile.close();
+
+        if (!newConfigFile) {
+            debugPrintln("failed to open config file for writing");
+        } else {
+            for(JsonPair currentObject : responseObject) {
+                const char* key = currentObject.key;
+                JsonVariant value = currentObject.value;
+                if (existingConfigObject.containsKey(String(key))) {
+                    existingConfigObject[key] = value;
+                } else {
+                    Serial.println("Nothing to change. Sad :(");
+                }
+                /*upcoming error handling
+                else {
+                    client.publish(buildTopic("return/system").c_str(),"No new settings written. Sad :(");
+                }*/
+            }
+            String response;
+            //existingConfigObject.printTo(Serial);
+            existingConfigObject.printTo(response);
+            existingConfigObject.printTo(newConfigFile);
+            client.publish(buildTopic("return/system").c_str(),("New MQTT-Settings: " + response).c_str());
+        }
+        newConfigFile.close();
+        delay(2000);
+        ESP.restart();
+    }
+    if (strcmp(topic, buildTopic("command/system/getConfig").c_str()) == 0) {
+        if (SPIFFS.exists("/config.json")) {
+            // file exists, reading and loading
+            File configFile = SPIFFS.open("/config.json", "r");
+            if (configFile) {
+                size_t size = configFile.size();
+                std::unique_ptr<char[]> buf(new char[size]);
+                configFile.readBytes(buf.get(), size);
+                DynamicJsonBuffer jsonBuffer;
+                JsonObject& json = jsonBuffer.parseObject(buf.get());
+                //json.printTo(Serial);
+                String response;
+                json.printTo(response);
+                client.publish(buildTopic("return/system").c_str(),("Current MQTT-Settings: " + response).c_str());
+            }
+        }
     }
     Serial.flush();
 }
