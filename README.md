@@ -10,13 +10,13 @@ Here are some examples how to use the MQTT interface:
 
 | Topic | example JSON | Outcome  |
 |--------|----------------|---|
-| visca/camera/command/moveto | <code>{<br>    x:400, <br>    y: 212, <br>    z: 0, <br>    focus: 420, <br>    cam: 0 <br>}<br></code> | Camera 0 moves to 400, 212, zooms all the way out, sets the focus to manual |
-| visca/camera/command/settings | <code>{<br>    backlight: true, <br>    flip: true, <br>    mirror: true, <br>    mmdetect: true <br>}</code> | Camera 0 turns on backlight compensation, flips and mirrors the image and enables [EMFDP](# "external mechanical fuckery detection and prevention") |
-| visca/camera/command/picture | <code>{<br>    wb:7,<br>    iris:-1,<br>    cam: 1<br>}<br></code | Camera 1 sets whitebalance to 7 and enables auto exposure |
-| visca/camera/command/blinkenlights | <code>{<br>    led: 1, <br>    mode: 2, <br>    cam: 0 <br>}</code>``` | Camera 0 turns on LED 1 in blinking mode. |
-| visca/system/command/getConfig | <code>{}</code> | Returns the current MQTT configuration |
-| visca/system/command/updateConfig | <code>{<br>    "mqtt_server":"127.0.0.1",<br>    "mqtt_port":"1883",<br>    "mqtt_user":"test",<br>    "mqtt_password":"",<br>    "mqtt_basetopic":<br>    "VISCA"<br>}</code> | Update settings within the stored config.json on the microcontroller |
-| visca/system/command/resetConfig | <code>{<br>    "reset":true<br>}</code> | Factory defaults.  |
+| visca/camera/command/moveto | ```{x:400, y: 212, z: 0, focus: 420, cam: 0 }``` | Camera 0 moves to 400, 212, zooms all the way out, sets the focus to manual |
+| visca/camera/command/settings | ```{backlight: true, flip: true, mirror: true, mmdetect: true }``` | Camera 0 turns on backlight compensation, flips and mirrors the image and enables [EMFDP](# "external mechanical fuckery detection and prevention") |
+| visca/camera/command/picture | ```{wb:7,iris:-1,cam: 1}``` | Camera 1 sets whitebalance to 7 and enables auto exposure |
+| visca/camera/command/blinkenlights | ```{led: 1, mode: 2, cam: 0 }`````` | Camera 0 turns on LED 1 in blinking mode. |
+| visca/system/command/getConfig | ```{}``` | Returns the current MQTT configuration |
+| visca/system/command/updateConfig | ```{"mqtt_server":"127.0.0.1","mqtt_port":"1883","mqtt_user":"test","mqtt_password":"","mqtt_basetopic":"VISCA"}``` | Update settings within the stored config.json on the microcontroller |
+| visca/system/command/resetConfig | ```{"reset":true}``` | Factory defaults.  |
 
 ## Hardware
 
