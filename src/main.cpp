@@ -32,19 +32,11 @@ void callback(char* topic, byte* payload, unsigned int length);
 
 // define your default values here, if there are different values in
 // config.json, they are overwritten. char mqtt_server[40];
-<<<<<<< HEAD
 String mqtt_server;
 uint16_t  mqtt_port;
 String mqtt_user;
 String mqtt_password;
 String mqtt_basetopic;
-=======
-#define mqtt_server "10.0.10.30"
-#define mqtt_port "1883"
-#define mqtt_user "user"
-#define mqtt_password "pass"
-#define mqtt_basetopic "Community/VISCA"
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -269,13 +261,8 @@ void parseCommand(uint8_t* command, int length) {
         return;
     }
 
-<<<<<<< HEAD
     client.publish(buildTopic("return/camera/raw").c_str(), command, length);
     client.publish(buildTopic("return/camera/length").c_str(), String(length).c_str());
-=======
-    client.publish(buildTopic("return/raw").c_str(), command, length);
-    client.publish(buildTopic("return/length").c_str(), String(length).c_str());
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
 }
 void handleSerial() {
@@ -317,11 +304,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
     uint8_t camNum = responseObject["cam"].as<uint8_t>();
 
-<<<<<<< HEAD
     if (strcmp(topic, buildTopic("command/camera/raw").c_str()) == 0) {
-=======
-    if (strcmp(topic, buildTopic("command/raw").c_str()) == 0) {
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
         Serial.write(payload, length);
         client.publish(buildTopic("status").c_str(),
@@ -368,11 +351,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
 
-<<<<<<< HEAD
     if (strcmp(topic, buildTopic("command/camera/picture").c_str()) == 0) {
-=======
-    if (strcmp(topic, buildTopic("command/picture").c_str()) == 0) {
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
         if (responseObject.containsKey("wb")) {
             VISCACommand command = wb(responseObject["wb"].as<int>(),
@@ -386,11 +365,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
     }
 
-<<<<<<< HEAD
     if (strcmp(topic, buildTopic("command/camera/moveto").c_str()) == 0) {
-=======
-    if (strcmp(topic, buildTopic("command/moveto").c_str()) == 0) {
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
         if (responseObject.containsKey("x")) {
             cams[responseObject["cam"].as<uint8_t>()].setX(
@@ -414,11 +389,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
 
-<<<<<<< HEAD
     if (strcmp(topic, buildTopic("command/camera/moveby").c_str()) == 0) {
-=======
-    if (strcmp(topic, buildTopic("command/moveby").c_str()) == 0) {
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
         if (!responseObject.containsKey("x")) {
             responseObject.set("x", 0);
@@ -435,7 +406,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
         client.publish(buildTopic("rawdata").c_str(), command.payload, command.len);
 
-<<<<<<< HEAD
     }
     if (strcmp(topic, buildTopic("command/system/resetConfig").c_str()) == 0) {
         if (responseObject.containsKey("reset") && responseObject["reset"]) {
@@ -500,8 +470,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
                 client.publish(buildTopic("return/system").c_str(),("Current MQTT-Settings: " + response).c_str());
             }
         }
-=======
->>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
     }
     Serial.flush();
 }
