@@ -33,7 +33,7 @@ void callback(char* topic, byte* payload, unsigned int length);
 // define your default values here, if there are different values in
 // config.json, they are overwritten. char mqtt_server[40];
 String mqtt_server;
-uint16_t  mqtt_port;
+uint16_t mqtt_port;
 String mqtt_user;
 String mqtt_password;
 String mqtt_basetopic;
@@ -311,7 +311,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
                        ("Kotze Daten " + String(length)).c_str());
     }
 
-    if (strcmp(topic, buildTopic("command/blinkenlights").c_str()) == 0) {
+    if (strcmp(topic, buildTopic("command/camera/blinkenlights").c_str()) == 0) {
 
         VISCACommand command =
             blinkenlights(responseObject["led"].as<uint8_t>(),
@@ -320,7 +320,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         Serial.write(command.payload, command.len);
     }
 
-    if (strcmp(topic, buildTopic("command/settings").c_str()) == 0) {
+    if (strcmp(topic, buildTopic("command/camera/settings").c_str()) == 0) {
 
         if (responseObject.containsKey("backlight")) {
             VISCACommand command =
@@ -404,7 +404,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
         Serial.write(command.payload, command.len);
 
-        client.publish(buildTopic("rawdata").c_str(), command.payload, command.len);
+        client.publish(buildTopic("camera/command/rawdata").c_str(), command.payload, command.len);
 
     }
     if (strcmp(topic, buildTopic("command/system/resetConfig").c_str()) == 0) {
