@@ -10,6 +10,7 @@ Here are some examples how to use the MQTT interface:
 
 | Topic | example JSON | Outcome  |
 |--------|----------------|---|
+<<<<<<< HEAD
 | visca/camera/command/moveto | ```{x:400, y: 212, z: 0, focus: 420, cam: 0 }``` | Camera 0 moves to 400, 212, zooms all the way out, sets the focus to manual |
 | visca/camera/command/settings | ```{backlight: true, flip: true, mirror: true, mmdetect: true }``` | Camera 0 turns on backlight compensation, flips and mirrors the image and enables [EMFDP](# "external mechanical fuckery detection and prevention") |
 | visca/camera/command/picture | ```{wb:7,iris:-1, cam: 1}``` | Camera 1 sets whitebalance to 7 and enables auto exposure |
@@ -17,6 +18,12 @@ Here are some examples how to use the MQTT interface:
 | visca/system/command/getConfig | ```{}``` | Returns the current MQTT configuration |
 | visca/system/command/updateConfig | ```{"mqtt_server":"127.0.0.1","mqtt_port":"1883","mqtt_user":"test","mqtt_password":"","mqtt_basetopic":"Katzen/Futter"}``` | Update settings within the stored config.json on the microcontroller |
 | visca/system/command/resetConfig | ```{"reset":true}``` | Factory defaults.  |
+=======
+| visca/command/moveto | ```{x:400, y: 212, z: 0, focus: 420, cam: 0 }``` | Camera 0 moves to 400, 212, zooms all the way out, sets the focus to manual |
+| visca/command/settings | ```{backlight: true, flip: true, mirror: true, mmdetect: true }``` | Camera 0 turns on backlight compensation, flips and mirrors the image and enables [EMFDP](# "external mechanical fuckery detection and prevention") |
+| visca/command/picture | ```{wb:7,iris:-1, cam: 1}``` | Camera 1 sets whitebalance to 7 and enables auto exposure |
+| visca/command/blinkenlights | ```{led: 1, mode: 2, cam: 0 }``` | Camera 0 turns on LED 1 in blinking mode. |
+>>>>>>> 2d8ef3353c435fd2c3bb3db52ee28d83e929d95f
 
 ## Hardware
 
