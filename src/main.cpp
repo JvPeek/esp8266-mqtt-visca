@@ -404,7 +404,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
         Serial.write(command.payload, command.len);
 
-        client.publish(buildTopic("camera/command/rawdata").c_str(), command.payload, command.len);
+        client.publish(buildTopic("command/camera/rawdata").c_str(), command.payload, command.len);
 
     }
     if (strcmp(topic, buildTopic("command/system/resetConfig").c_str()) == 0) {
