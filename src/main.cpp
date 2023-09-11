@@ -307,7 +307,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (strcmp(topic, buildTopic("command/camera/raw").c_str()) == 0) {
 
         Serial.write(payload, length);
-        client.publish(buildTopic("status").c_str(),
+        client.publish(buildTopic("return/camera/status").c_str(),
                        ("Kotze Daten " + String(length)).c_str());
     }
 
