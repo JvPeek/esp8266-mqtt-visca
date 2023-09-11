@@ -1,7 +1,7 @@
 {
-    "mqtt_server":"10.0.10.30",
+    "mqtt_server":"127.0.0.1",
     "mqtt_port": "1883",
-    "mqtt_user":"iot",
-    "mqtt_password":"8ZsLNGYH7mzFLrMleUY1",
-    "mqtt_basetopic": "Community/VISCA/command/#"
+    "mqtt_user":"",
+    "mqtt_password":"",
+    "mqtt_basetopic": "VISCA"
 }
