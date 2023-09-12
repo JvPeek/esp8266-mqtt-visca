@@ -11,13 +11,13 @@ Here are some examples how to use the MQTT interface:
 
 | Topic | example JSON | Outcome  |
 |--------|----------------|---|
-| visca/camera/command/moveto | ```{x: 400, y: 212, z: 0, focus: 420, cam: 0}``` | Camera 0 moves to 400, 212, zooms all the way out, sets the focus to manual |
-| visca/camera/command/settings | ```{backlight: true, flip: true, mirror: true, mmdetect: true}``` | Camera 0 turns on backlight compensation, flips and mirrors the image and enables [EMFDP](# "external mechanical fuckery detection and prevention") |
-| visca/camera/command/picture | ```{wb: 7, iris: -1, cam: 1}``` | Camera 1 sets whitebalance to 7 and enables auto exposure |
-| visca/camera/command/blinkenlights | ```{led: 1, mode: 2, cam: 0}``` | Camera 0 turns on LED 1 in blinking mode |
-| visca/system/command/getConfig | ```{}``` | Returns the current MQTT configuration |
-| visca/system/command/updateConfig | ```{"mqtt_server": "127.0.0.1", "mqtt_port": "1883", "mqtt_user": "test", "mqtt_password": "", "mqtt_basetopic": "VISCA"}``` | Update settings within the stored config.json on the microcontroller |
-| visca/system/command/resetConfig | ```{"reset": true}``` | Factory defaults |
+| visca/command/camera/moveto | ```{x: 400, y: 212, z: 0, focus: 420, cam: 0}``` | Camera 0 moves to 400, 212, zooms all the way out, sets the focus to manual |
+| visca/command/camera/settings | ```{backlight: true, flip: true, mirror: true, mmdetect: true}``` | Camera 0 turns on backlight compensation, flips and mirrors the image and enables [EMFDP](# "external mechanical fuckery detection and prevention") |
+| visca/command/camera/picture | ```{wb: 7, iris: -1, cam: 1}``` | Camera 1 sets whitebalance to 7 and enables auto exposure |
+| visca/command/camera/blinkenlights | ```{led: 1, mode: 2, cam: 0}``` | Camera 0 turns on LED 1 in blinking mode |
+| visca/command/system/getConfig | ```{}``` | Returns the current MQTT configuration |
+| visca/command/system/updateConfig | ```{"mqtt_server": "127.0.0.1", "mqtt_port": "1883", "mqtt_user": "test", "mqtt_password": "", "mqtt_basetopic": "VISCA"}``` | Update settings within the stored config.json on the microcontroller |
+| visca/command/system/resetConfig | ```{"reset": true}``` | Factory defaults |
 
 ## Hardware
 
