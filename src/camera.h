@@ -2,8 +2,10 @@
 #pragma once
 #define MAXX 800
 #define MAXY 212
-#define MAXZ 2305
-#define MAXF 65535
+//Range 0-2885
+#define MAXZ 2885
+//Range 4096-4672
+#define MAXF 5000
 #define NUM_CAMS 7
 
 

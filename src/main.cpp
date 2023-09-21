@@ -4,7 +4,7 @@
 #include <ESP8266WiFi.h>  //https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>
 #include <FS.h>  //this needs to be first, or it all crashes and burns...
-
+#include <SoftwareSerial.h>
 // needed for library
 
 #include <DNSServer.h>
@@ -16,6 +16,8 @@
 
 #include <camera.h>
 #include <commands.h>
+
+SoftwareSerial visca(D1,D2);
 
 
 void debugPrint(String prompt) {}
@@ -48,9 +50,9 @@ void saveConfigCallback() {
 }
 void setup() {
     Serial.begin(9600);
-
+    visca.begin(9600);
     // put your setup code here, to run once:
-
+    
     debugPrint("MAC: ");
     debugPrintln(WiFi.macAddress());
     WiFi.mode(WIFI_STA);
@@ -269,10 +271,12 @@ void handleSerial() {
     static enum { IDLE, RECEIVING } state = IDLE;
     static uint8_t buff[17] = {0};
     static int buffIndex = 0;
-
-    while (Serial.available() > 0) {
-        uint8_t receivedByte = Serial.read();
-
+    while (visca.available() > 0) {
+        uint8_t receivedByte = visca.read();
+        Serial.println(receivedByte);
+        client.publish("VISCA/return/camera/mqtt/", "Reading Data:");
+        client.publish("VISCA/return/camera/mqtt/", String(receivedByte, HEX).c_str());
+        //Serial.println(receivedByte, HEX);
         switch (state) {
             case IDLE:
                 if (receivedByte == 0x90) {
@@ -306,7 +310,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
     if (strcmp(topic, buildTopic("command/camera/raw").c_str()) == 0) {
 
-        Serial.write(payload, length);
+        visca.write(payload, length);
+        const uint focus = responseObject["focus"];
+        byte focusValues[4];
+        convertValues(focus, focusValues);
+        for(int i =0; i < 4; i++){
+            client.publish("VISCA/return/dev",String(focusValues[i]).c_str());            
+        }
+
         client.publish(buildTopic("return/camera/status").c_str(),
                        ("Kotze Daten " + String(length)).c_str());
     }
@@ -317,7 +328,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
             blinkenlights(responseObject["led"].as<uint8_t>(),
                           responseObject["mode"].as<uint8_t>(),
                           responseObject["cam"].as<uint8_t>());
-        Serial.write(command.payload, command.len);
+        visca.write(command.payload, command.len);
     }
 
     if (strcmp(topic, buildTopic("command/camera/settings").c_str()) == 0) {
@@ -326,25 +337,25 @@ void callback(char* topic, byte* payload, unsigned int length) {
             VISCACommand command =
                 backlight(responseObject["backlight"].as<bool>(),
                           responseObject["cam"].as<uint8_t>());
-            Serial.write(command.payload, command.len);
+            visca.write(command.payload, command.len);
         }
 
         if (responseObject.containsKey("mirror")) {
             VISCACommand command = mirror(responseObject["mirror"].as<bool>(),
                                           responseObject["cam"].as<uint8_t>());
-            Serial.write(command.payload, command.len);
+            visca.write(command.payload, command.len);
         }
         if (responseObject.containsKey("flip")) {
             VISCACommand command = flip(responseObject["flip"].as<bool>(),
                                         responseObject["cam"].as<uint8_t>());
-            Serial.write(command.payload, command.len);
+            visca.write(command.payload, command.len);
         }
 
         if (responseObject.containsKey("mmdetect")) {
             VISCACommand command =
                 mmdetect(responseObject["mmdetect"].as<bool>(),
                          responseObject["cam"].as<uint8_t>());
-            Serial.write(command.payload, command.len);
+            visca.write(command.payload, command.len);
         }
 
         //  ir_output, ir_cameracontrol
@@ -356,12 +367,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (responseObject.containsKey("wb")) {
             VISCACommand command = wb(responseObject["wb"].as<int>(),
                                       responseObject["cam"].as<uint8_t>());
-            Serial.write(command.payload, command.len);
+            visca.write(command.payload, command.len);
         }
         if (responseObject.containsKey("iris")) {
             VISCACommand command = iris(responseObject["iris"].as<int>(),
                                         responseObject["cam"].as<uint8_t>());
-            Serial.write(command.payload, command.len);
+            visca.write(command.payload, command.len);
         }
     }
 
@@ -385,7 +396,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
         VISCACommand command = movement(responseObject["cam"].as<uint8_t>());
 
-        Serial.write(command.payload, command.len);
+        visca.write(command.payload, command.len);
     }
 
 
@@ -402,10 +413,20 @@ void callback(char* topic, byte* payload, unsigned int length) {
             responseObject["x"].as<int>(), responseObject["y"].as<int>(),
             responseObject["cam"].as<uint8_t>());
 
-        Serial.write(command.payload, command.len);
+        visca.write(command.payload, command.len);
 
         client.publish(buildTopic("command/camera/rawdata").c_str(), command.payload, command.len);
 
+    }
+    if (strcmp(topic, buildTopic("command/camera/clearBuffer").c_str()) == 0) {
+        VISCACommand command = clearBuffer(responseObject["cam"].as<uint8_t>());
+
+        visca.write(command.payload, command.len);
+    }
+    if (strcmp(topic, buildTopic("command/camera/setAddress").c_str()) == 0) {
+        VISCACommand command = setAddress(responseObject["cam"].as<uint8_t>(), responseObject["address"].as<int>());
+
+        visca.write(command.payload, command.len);
     }
     if (strcmp(topic, buildTopic("command/system/resetConfig").c_str()) == 0) {
         if (responseObject.containsKey("reset") && responseObject["reset"]) {
@@ -471,5 +492,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
             }
         }
     }
-    Serial.flush();
+    if (strcmp(topic, buildTopic("command/system/reboot").c_str()) == 0) {
+        ESP.restart();
+    }
+    visca.flush();
 }

@@ -23,5 +23,7 @@ VISCACommand mmdetect(bool setting = 0, uint8_t cam = 0);
 VISCACommand wb(int setting = 0, uint8_t cam = 0);
 VISCACommand iris(int setting = 0, uint8_t cam = 0);
 VISCACommand relativeMovement(int x, int y, uint8_t cam = 0);
+VISCACommand clearBuffer(uint8_t cam = 0);
+VISCACommand setAddress(uint8_t cam = 0, int address = 0);
 
 VISCACommand movement(uint8_t cam = 0);
