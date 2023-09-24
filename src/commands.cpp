@@ -120,11 +120,6 @@ VISCACommand movement(uint8_t cam) {
 
     byte focusValues[4];
     convertValues(focus, focusValues);
-    Serial.println();
-    Serial.println(focusValues[0]);
-    Serial.println(focusValues[1]);
-    Serial.println(focusValues[2]);
-    Serial.println(focusValues[3]);
     byte cmd[] = {0x01,           0x04,
                   0x38,           (focus == -1 ? 0x02 : 0x03),
                   0xff,           (0x81 + cam),

@@ -3,7 +3,8 @@
 #include <ArduinoOTA.h>
 #include <ESP8266WiFi.h>  //https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>
-#include <FS.h>  //this needs to be first, or it all crashes and burns...
+//#include <FS.h>  //this needs to be first, or it all crashes and burns...
+#include "LittleFS.h"
 // needed for library
 
 #include <DNSServer.h>
@@ -60,12 +61,12 @@ void setup() {
     // read configuration from FS json
     debugPrintln("mounting FS...");
 
-    if (SPIFFS.begin()) {
+    if (LittleFS.begin()) {
         debugPrintln("mounted file system");
-        if (SPIFFS.exists("/config.json")) {
+        if (LittleFS.exists("/config.json")) {
             // file exists, reading and loading
             debugPrintln("reading config file");
-            File configFile = SPIFFS.open("/config.json", "r");
+            File configFile = LittleFS.open("/config.json", "r");
             if (configFile) {
                 debugPrintln("opened config file");
                 size_t size = configFile.size();
@@ -74,11 +75,7 @@ void setup() {
 
                 configFile.readBytes(buf.get(), size);
                 DynamicJsonDocument jsonBuffer(1024);
-                //JsonObject& json = jsonBuffer.parseObject(buf.get());
                 DeserializationError deserializeError = deserializeJson(jsonBuffer,buf.get());
-                //Old dump into Serial
-                //json.printTo(Serial);
-                Serial.println(String(jsonBuffer["mqtt_server"]).c_str());
                 if (!deserializeError) {
                     debugPrintln("\nparsed json");
                     mqtt_server = String(jsonBuffer["mqtt_server"]);
@@ -99,11 +96,16 @@ void setup() {
     // The extra parameters to be configured (can be either global or just in
     // the setup) After connecting, parameter.getValue() will get you the
     // configured value id/name placeholder/prompt default length
+    if(mqtt_basetopic == "") {
+        const char* mqtt_basetopic = "VISCA";
+        Serial.println(mqtt_basetopic);
+    } 
+
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server",mqtt_server.c_str(), 40);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", String(mqtt_port).c_str(), 6);
     WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user.c_str(), 40);
     WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password.c_str(), 40);
-    WiFiManagerParameter custom_mqtt_basetopic("basetopic", "mqtt basetopic", "VISCA", 128);
+    WiFiManagerParameter custom_mqtt_basetopic("basetopic", "mqtt basetopic", mqtt_basetopic.c_str(), 128);
 
     // WiFiManager
     // Local intialization. Once its business is done, there is no need to keep
@@ -190,7 +192,7 @@ void setup() {
         debugPrintln("saving config");
         //DynamicJsonBuffer jsonBuffer;
         //JsonObject& json = jsonBuffer.createObject();
-        DynamicJsonDocument jsonBuffer(1024);
+        StaticJsonDocument<256> jsonBuffer;
         //JsonObject& json = jsonBuffer.parseObject(buf.get());
         //DeserializationError jsonError = 
         //deserializeJson(jsonBuffer,buf.get());
@@ -201,14 +203,14 @@ void setup() {
         jsonBuffer["mqtt_password"] = custom_mqtt_password.getValue();
         jsonBuffer["mqtt_basetopic"] = custom_mqtt_basetopic.getValue();
 
-        File configFile = SPIFFS.open("/config.json", "w");
+        File configFile = LittleFS.open("/config.json", "w");
         if (!configFile) {
             debugPrintln("failed to open config file for writing");
         }
 
         //json.printTo(Serial);
         //json.printTo(configFile);
-        serializeJsonPretty(jsonBuffer, Serial);
+        //serializeJsonPretty(jsonBuffer, Serial);
         serializeJson(jsonBuffer, configFile);
         configFile.close();
         // end save
@@ -284,7 +286,6 @@ void handleSerial() {
         Serial.println(receivedByte);
         client.publish("VISCA/return/camera/mqtt/", "Reading Data:");
         client.publish("VISCA/return/camera/mqtt/", String(receivedByte, HEX).c_str());
-        //Serial.println(receivedByte, HEX);
         switch (state) {
             case IDLE:
                 if (receivedByte == 0x90) {
@@ -450,8 +451,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
     if (strcmp(topic, buildTopic("command/system/updateConfig").c_str()) == 0) {
 
-        File existingConfigFile = SPIFFS.open("/config.json", "r");
-        File newConfigFile = SPIFFS.open("/config.json", "r+");
+        File existingConfigFile = LittleFS.open("/config.json", "r");
+        File newConfigFile = LittleFS.open("/config.json", "r+");
         //JSON-Object from storage
         size_t size = existingConfigFile.size();
         std::unique_ptr<char[]> buf(new char[size]);
@@ -490,9 +491,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
         ESP.restart();
     }
     if (strcmp(topic, buildTopic("command/system/getConfig").c_str()) == 0) {
-        if (SPIFFS.exists("/config.json")) {
+
+        if (LittleFS.exists("/config.json")) {
             // file exists, reading and loading
-            File configFile = SPIFFS.open("/config.json", "r");
+            File configFile = LittleFS.open("/config.json", "r");
             if (configFile) {
                 size_t size = configFile.size();
                 std::unique_ptr<char[]> buf(new char[size]);
@@ -501,7 +503,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
                 deserializeJson(existingBuffer,buf.get());
                 char mqttResponse[256];
                 serializeJson(existingBuffer, mqttResponse);
-                serializeJsonPretty(existingBuffer, Serial);
                 client.publish(buildTopic("return/system").c_str(),mqttResponse);
             }
         }
