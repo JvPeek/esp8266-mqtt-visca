@@ -4,7 +4,6 @@
 #include <ESP8266WiFi.h>  //https://github.com/esp8266/Arduino
 #include <ESP8266mDNS.h>
 #include <FS.h>  //this needs to be first, or it all crashes and burns...
-#include <SoftwareSerial.h>
 // needed for library
 
 #include <DNSServer.h>
@@ -74,17 +73,19 @@ void setup() {
                 std::unique_ptr<char[]> buf(new char[size]);
 
                 configFile.readBytes(buf.get(), size);
-                DynamicJsonBuffer jsonBuffer;
-                JsonObject& json = jsonBuffer.parseObject(buf.get());
+                DynamicJsonDocument jsonBuffer(1024);
+                //JsonObject& json = jsonBuffer.parseObject(buf.get());
+                DeserializationError deserializeError = deserializeJson(jsonBuffer,buf.get());
                 //Old dump into Serial
                 //json.printTo(Serial);
-                if (json.success()) {
+                Serial.println(String(jsonBuffer["mqtt_server"]).c_str());
+                if (!deserializeError) {
                     debugPrintln("\nparsed json");
-                    mqtt_server = String(json["mqtt_server"]);
-                    mqtt_port = String(json["mqtt_port"]).toInt();
-                    mqtt_user = String(json["mqtt_user"]);
-                    mqtt_password = String(json["mqtt_password"]);
-                    mqtt_basetopic = String(json["mqtt_basetopic"]);
+                    mqtt_server = String(jsonBuffer["mqtt_server"]);
+                    mqtt_port = String(jsonBuffer["mqtt_port"]).toInt();
+                    mqtt_user = String(jsonBuffer["mqtt_user"]);
+                    mqtt_password = String(jsonBuffer["mqtt_password"]);
+                    mqtt_basetopic = String(jsonBuffer["mqtt_basetopic"]);
                 } else {
                     debugPrintln("failed to load json config");
                 }
@@ -187,13 +188,18 @@ void setup() {
     // save the custom parameters to FS
     if (shouldSaveConfig) {
         debugPrintln("saving config");
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.createObject();
-        json["mqtt_server"] = custom_mqtt_server.getValue();
-        json["mqtt_port"] = custom_mqtt_port.getValue();
-        json["mqtt_user"] = custom_mqtt_user.getValue();
-        json["mqtt_password"] = custom_mqtt_password.getValue();
-        json["mqtt_basetopic"] = custom_mqtt_basetopic.getValue();
+        //DynamicJsonBuffer jsonBuffer;
+        //JsonObject& json = jsonBuffer.createObject();
+        DynamicJsonDocument jsonBuffer(1024);
+        //JsonObject& json = jsonBuffer.parseObject(buf.get());
+        //DeserializationError jsonError = 
+        //deserializeJson(jsonBuffer,buf.get());
+
+        jsonBuffer["mqtt_server"] = custom_mqtt_server.getValue();
+        jsonBuffer["mqtt_port"] = custom_mqtt_port.getValue();
+        jsonBuffer["mqtt_user"] = custom_mqtt_user.getValue();
+        jsonBuffer["mqtt_password"] = custom_mqtt_password.getValue();
+        jsonBuffer["mqtt_basetopic"] = custom_mqtt_basetopic.getValue();
 
         File configFile = SPIFFS.open("/config.json", "w");
         if (!configFile) {
@@ -201,7 +207,9 @@ void setup() {
         }
 
         //json.printTo(Serial);
-        json.printTo(configFile);
+        //json.printTo(configFile);
+        serializeJsonPretty(jsonBuffer, Serial);
+        serializeJson(jsonBuffer, configFile);
         configFile.close();
         // end save
     }
@@ -301,12 +309,13 @@ void handleSerial() {
 void callback(char* topic, byte* payload, unsigned int length) {
     /*Preparation for sourcing out into commands.cpp*/
     //handleCommands(topic, payload, length);
-    DynamicJsonBuffer response(1024);
-    JsonObject& responseObject = response.parseObject(payload);
+    DynamicJsonDocument response(1024);
+    deserializeJson(response,payload);
+    JsonObject responseObject = response.as<JsonObject>();
     if (!responseObject.containsKey("cam")) {
-        responseObject.set("cam", 0);
+        responseObject["cam"] = 0;
     }
-    uint8_t camNum = responseObject["cam"].as<uint8_t>();
+    //uint8_t camNum = responseObject["cam"].as<uint8_t>();
 
     if (strcmp(topic, buildTopic("command/camera/raw").c_str()) == 0) {
 
@@ -377,8 +386,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     if (strcmp(topic, buildTopic("command/camera/moveto").c_str()) == 0) {
-
+        Serial.println(responseObject.containsKey("x"));
         if (responseObject.containsKey("x")) {
+            Serial.println(String(responseObject["cam"].as<uint8_t>()).c_str());
+            Serial.println(String(responseObject["x"].as<int>()).c_str());
             cams[responseObject["cam"].as<uint8_t>()].setX(
                 responseObject["x"].as<int>());
         }
@@ -403,10 +414,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (strcmp(topic, buildTopic("command/camera/moveby").c_str()) == 0) {
 
         if (!responseObject.containsKey("x")) {
-            responseObject.set("x", 0);
+            responseObject["x"] = 0;
         }
         if (!responseObject.containsKey("y")) {
-            responseObject.set("y", 0);
+            responseObject["y"] = 0;
         }
 
         VISCACommand command = relativeMovement(
@@ -438,23 +449,24 @@ void callback(char* topic, byte* payload, unsigned int length) {
         
     }
     if (strcmp(topic, buildTopic("command/system/updateConfig").c_str()) == 0) {
+
         File existingConfigFile = SPIFFS.open("/config.json", "r");
         File newConfigFile = SPIFFS.open("/config.json", "r+");
         //JSON-Object from storage
         size_t size = existingConfigFile.size();
         std::unique_ptr<char[]> buf(new char[size]);
         existingConfigFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer existingBuffer;
-        JsonObject& existingConfigObject = existingBuffer.parseObject(buf.get());
+        StaticJsonDocument<256> existingBuffer;
+        deserializeJson(existingBuffer,buf.get());
+        JsonObject existingConfigObject = existingBuffer.as<JsonObject>();
         responseObject.remove("cam");
         existingConfigFile.close();
-
         if (!newConfigFile) {
             debugPrintln("failed to open config file for writing");
         } else {
             for(JsonPair currentObject : responseObject) {
-                const char* key = currentObject.key;
-                JsonVariant value = currentObject.value;
+                const char* key = currentObject.key().c_str();
+                JsonVariant value = currentObject.value();
                 if (existingConfigObject.containsKey(String(key))) {
                     existingConfigObject[key] = value;
                 } else {
@@ -465,11 +477,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
                     client.publish(buildTopic("return/system").c_str(),"No new settings written. Sad :(");
                 }*/
             }
-            String response;
+            String mqttResponse;
             //existingConfigObject.printTo(Serial);
-            existingConfigObject.printTo(response);
-            existingConfigObject.printTo(newConfigFile);
-            client.publish(buildTopic("return/system").c_str(),("New MQTT-Settings: " + response).c_str());
+            //existingBuffer.printTo(response);
+            //existingBuffer.printTo(newConfigFile);
+            serializeJsonPretty(existingBuffer, mqttResponse);
+            serializeJson(existingBuffer,newConfigFile);
+            client.publish(buildTopic("return/system").c_str(),("New MQTT-Settings: " + mqttResponse).c_str());
         }
         newConfigFile.close();
         delay(2000);
@@ -483,12 +497,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
                 size_t size = configFile.size();
                 std::unique_ptr<char[]> buf(new char[size]);
                 configFile.readBytes(buf.get(), size);
-                DynamicJsonBuffer jsonBuffer;
-                JsonObject& json = jsonBuffer.parseObject(buf.get());
-                //json.printTo(Serial);
-                String response;
-                json.printTo(response);
-                client.publish(buildTopic("return/system").c_str(),("Current MQTT-Settings: " + response).c_str());
+                StaticJsonDocument<256> existingBuffer;
+                deserializeJson(existingBuffer,buf.get());
+                char mqttResponse[256];
+                serializeJson(existingBuffer, mqttResponse);
+                serializeJsonPretty(existingBuffer, Serial);
+                client.publish(buildTopic("return/system").c_str(),mqttResponse);
             }
         }
     }
