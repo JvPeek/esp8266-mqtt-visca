@@ -43,7 +43,7 @@ VISCACommand mmdetect(bool setting, uint8_t cam) {
     byte cmd[] = {0x01, 0x50, 0x30, 0x01, setting};
     VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
     return command;
-}
+}   
 void convertValues(uint input, byte* output) {
     output[0] = (input >> 12) & 0x0f;
     output[1] = (input >> 8) & 0x0f;
@@ -120,7 +120,11 @@ VISCACommand movement(uint8_t cam) {
 
     byte focusValues[4];
     convertValues(focus, focusValues);
-
+    Serial.println();
+    Serial.println(focusValues[0]);
+    Serial.println(focusValues[1]);
+    Serial.println(focusValues[2]);
+    Serial.println(focusValues[3]);
     byte cmd[] = {0x01,           0x04,
                   0x38,           (focus == -1 ? 0x02 : 0x03),
                   0xff,           (0x81 + cam),
@@ -144,13 +148,35 @@ VISCACommand movement(uint8_t cam) {
     return command;
 }
 
+VISCACommand clearBuffer(uint8_t cam) {
+
+    byte cmd[] = {(0x81 + cam),           0x01,
+                  0x00,                   0x01,
+                  0xff
+                  };
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+
+    return command;
+}
+
+VISCACommand setAddress(uint8_t cam, int address) {
+    byte cmd[] = {(0x81 + cam),           0x30,
+                  (0x00 + address),           0xff
+                  };
+    VISCACommand command = makePackage(cmd, sizeof(cmd), cam);
+
+    return command;
+}
+
+
 void requestEverything() {
     // 8x 09 06 12 ff request PT
     //
     byte cmd[] = {0x81, 0x09, 0x06, 0x12, 0xFF};
     for (uint8_t i = 0; i < NUM_CAMS; i++) {
         cmd[0] = 0x81 + i;
-        Serial.write(cmd, sizeof(cmd));
+        //Serial.write(cmd, sizeof(cmd));
+        //Serial.println(Serial.read(), HEX);
     }
 }
 

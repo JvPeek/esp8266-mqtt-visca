@@ -24,7 +24,9 @@ Here are some examples how to use the MQTT interface:
 - [D1 mini](https://www.wemos.cc/en/latest/d1/d1_mini.html) (any other ESP8266 will work. Haven't tested ESP32 boards yet)
 - [max3232 breakout board](https://www.makershop.de/module/schnittstellen/max3232-mini/) (The DB9 version will also work)
 
-__Somewhat important note: Do not use software serial for VISCA. Doesn't work. Makes you bang your head against the wall.__
+__~~Somewhat important note: Do not use software serial for VISCA. Doesn't work. Makes you bang your head against the wall.~~__
+__Obsolete was probably a wiring issue. Software serial is working fine as well__
+
 
 ## Resources for further development
 
